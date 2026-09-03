@@ -1,0 +1,52 @@
+export {
+  connectDatabase,
+  disconnectDatabase,
+  getMongoose,
+  isDatabaseReady,
+  resetDatabaseStateForTests,
+} from './connection';
+export { mapPersistenceError } from './errors';
+export {
+  AnswerFileModel,
+  AuthSessionModel,
+  AttemptModel,
+  AuditLogModel,
+  CategoryModel,
+  EntitlementModel,
+  EvaluationModel,
+  EvaluationRevisionModel,
+  EvaluatorCategoryAssignmentModel,
+  ModuleModel,
+  PurchaseModel,
+  QuestionFileModel,
+  QuestionModel,
+  ResultModel,
+  SubmissionFileModel,
+  SubmissionModel,
+  TestSeriesModel,
+  UserModel,
+  WebhookEventModel,
+} from './models/index';
+export {
+  answerFileRepository,
+  authSessionRepository,
+  attemptRepository,
+  auditLogRepository,
+  categoryRepository,
+  entitlementRepository,
+  evaluationRepository,
+  evaluationRevisionRepository,
+  evaluatorCategoryAssignmentRepository,
+  moduleRepository,
+  purchaseRepository,
+  questionFileRepository,
+  questionRepository,
+  resultRepository,
+  submissionFileRepository,
+  submissionRepository,
+  testSeriesRepository,
+  userRepository,
+  webhookEventRepository,
+} from './repositories/index';
+export type { SessionOption } from './repositories/types';
+export { startSession, withTransaction } from './transactions';
