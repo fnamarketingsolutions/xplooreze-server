@@ -38,7 +38,11 @@ import {
   toEvaluatorEvaluationDto,
 } from './evaluation.dto';
 import { McqScoringError, scoreMcqSubmission, snapshottedMaxScore } from './evaluation-scoring';
-import type { AdminEvaluationListQuery, UpdateEvaluationInput } from './evaluation.validation';
+import type {
+  AdminEvaluationListQuery,
+  EvaluatorEvaluationListQuery,
+  UpdateEvaluationInput,
+} from './evaluation.validation';
 import { buildTestSeriesSummaryByIds } from '../test-series/test-series-summary';
 
 export type EvaluationActor = {
@@ -819,11 +823,20 @@ export async function getEvaluatorSummary(evaluatorId: string) {
   };
 }
 
-export async function listEvaluatorEvaluations(evaluatorId: string, pagination: PaginationInput) {
-  const filter = {
+export async function listEvaluatorEvaluations(
+  evaluatorId: string,
+  query: EvaluatorEvaluationListQuery,
+  pagination: PaginationInput,
+) {
+  const filter: Record<string, unknown> = {
     evaluatorId,
     mode: 'MANUAL',
   };
+
+  if (query.status) {
+    filter.status = query.status;
+  }
+
   const [items, total] = await Promise.all([
     evaluationRepository.list(filter, {
       skip: pagination.skip,

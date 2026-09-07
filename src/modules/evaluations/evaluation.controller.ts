@@ -41,8 +41,11 @@ export async function listEvaluatorEvaluationsController(
   res: Response,
 ): Promise<void> {
   const auth = requireAuth(req);
-  parseEvaluatorListQuery(req.query as Record<string, unknown>);
-  const result = await listEvaluatorEvaluations(auth.userId, parsePagination(req.query));
+  const result = await listEvaluatorEvaluations(
+    auth.userId,
+    parseEvaluatorListQuery(req.query as Record<string, unknown>),
+    parsePagination(req.query),
+  );
 
   res.status(200).json({
     success: true,

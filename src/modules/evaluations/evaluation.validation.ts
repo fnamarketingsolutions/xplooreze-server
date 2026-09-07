@@ -32,6 +32,10 @@ export type AdminEvaluationListQuery = {
   mode?: EvaluationMode;
 };
 
+export type EvaluatorEvaluationListQuery = {
+  status?: EvaluationStatus;
+};
+
 function readEvaluationStatus(value: string, field: string): EvaluationStatus {
   if (
     value !== 'UNASSIGNED' &&
@@ -121,7 +125,7 @@ export function parseAdminEvaluationListQuery(query: object): AdminEvaluationLis
   };
 }
 
-export function parseEvaluatorListQuery(query: object): void {
+export function parseEvaluatorListQuery(query: object): EvaluatorEvaluationListQuery {
   const record = query as Record<string, unknown>;
 
   if (record.evaluatorId !== undefined) {
@@ -131,4 +135,13 @@ export function parseEvaluatorListQuery(query: object): void {
   if (record.categoryId !== undefined) {
     throw validationError({ categoryId: 'Field is not allowed.' });
   }
+
+  const status = readQueryValue(record, 'status');
+
+  return {
+    status:
+      status === undefined || status.trim() === ''
+        ? undefined
+        : readEvaluationStatus(status, 'status'),
+  };
 }
