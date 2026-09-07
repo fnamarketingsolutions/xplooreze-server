@@ -568,6 +568,30 @@ describe('Phase 10 Evaluation Engine', () => {
         ]),
       );
 
+      const listedInProgress = await request(app)
+        .get('/evaluator/evaluations?status=IN_PROGRESS')
+        .set(bearer(evaluatorToken));
+      expect(listedInProgress.status).toBe(200);
+      expect(listedInProgress.body.data).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: evaluationId, status: 'IN_PROGRESS' }),
+        ]),
+      );
+      expect(
+        listedInProgress.body.data.every((row: { status: string }) => row.status === 'IN_PROGRESS'),
+      ).toBe(true);
+
+      const listedAssigned = await request(app)
+        .get('/evaluator/evaluations?status=ASSIGNED')
+        .set(bearer(evaluatorToken));
+      expect(listedAssigned.status).toBe(200);
+      expect(listedAssigned.body.data.find((row: { id: string }) => row.id === evaluationId)).toBeUndefined();
+
+      const listedBadStatus = await request(app)
+        .get('/evaluator/evaluations?status=NOT_A_STATUS')
+        .set(bearer(evaluatorToken));
+      expect(listedBadStatus.status).toBe(400);
+
       const scored = await request(app)
         .patch(`/evaluator/evaluations/${evaluationId}`)
         .set(bearer(evaluatorToken))

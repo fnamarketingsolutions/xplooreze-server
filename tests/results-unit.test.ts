@@ -78,6 +78,7 @@ describe('Phase 11 result unit rules', () => {
       percentage: 80,
       status: 'PUBLISHED',
       publishedAt: '2026-08-14T12:00:00.000Z',
+      testSeries: null,
     });
     expect(toStudentResultDto(result)).not.toHaveProperty('evaluationId');
     expect(toStudentResultDto(result)).not.toHaveProperty('remarks');
