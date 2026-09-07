@@ -1,10 +1,11 @@
 import 'dotenv/config';
 
-import { createApp } from './app';
 import { loadConfig } from './config/index';
+import { createApp } from './create-app';
 import { connectDatabase } from './database/index';
 import { startBlobCleanupJob, startPurchaseCleanupJob } from './jobs/index';
 import { getLogger } from './shared/logger/logger';
+import { isVercelRuntime } from './shared/runtime/vercel';
 import { setupGracefulShutdown } from './shared/shutdown/graceful-shutdown';
 
 async function main(): Promise<void> {
@@ -25,8 +26,13 @@ async function main(): Promise<void> {
     );
   });
 
-  startBlobCleanupJob();
-  startPurchaseCleanupJob();
+  // In-process interval jobs are unreliable on Vercel; defaults are off when VERCEL=1.
+  if (!isVercelRuntime()) {
+    startBlobCleanupJob();
+    startPurchaseCleanupJob();
+  } else {
+    logger.info('Skipping in-process cleanup jobs on Vercel runtime');
+  }
   setupGracefulShutdown(server);
 }
 

@@ -4,7 +4,7 @@ import path from 'node:path';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createApp } from '../src/app';
+import { createApp } from '../src/create-app';
 import { loadConfig, resetConfigForTests } from '../src/config/index';
 import { AuthSessionModel } from '../src/database/models/auth-session.model';
 import { PasswordResetTokenModel } from '../src/database/models/password-reset-token.model';

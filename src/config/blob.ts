@@ -1,3 +1,4 @@
+import { isVercelRuntime } from '../shared/runtime/vercel';
 import { optionalString } from './env-helpers';
 
 const DEFAULT_UPLOAD_URL_TTL_SECONDS = 300;
@@ -60,11 +61,15 @@ function parseBlobAccess(value: string | undefined): BlobAccess {
   throw new Error('Invalid BLOB_ACCESS. Expected public or private.');
 }
 
-function parseCleanupEnabled(value: string | undefined): boolean {
+function parseCleanupEnabled(
+  value: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
   const raw = optionalString(value)?.toLowerCase();
 
   if (!raw) {
-    return true;
+    // In-process intervals do not run reliably on Vercel; default off there.
+    return !isVercelRuntime(env);
   }
 
   if (raw === 'true') {
@@ -110,7 +115,7 @@ export function loadBlobConfig(env: NodeJS.ProcessEnv = process.env): BlobConfig
       'BLOB_DOWNLOAD_URL_TTL_SECONDS',
       DEFAULT_DOWNLOAD_URL_TTL_SECONDS,
     ),
-    cleanupEnabled: parseCleanupEnabled(env.BLOB_CLEANUP_ENABLED),
+    cleanupEnabled: parseCleanupEnabled(env.BLOB_CLEANUP_ENABLED, env),
     cleanupIntervalMs: parseCleanupIntervalMs(env.BLOB_CLEANUP_INTERVAL_MS),
   };
 }

@@ -4,7 +4,7 @@ import request from 'supertest';
 import { Types } from 'mongoose';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createApp } from '../src/app';
+import { createApp } from '../src/create-app';
 import { loadConfig, resetConfigForTests } from '../src/config/index';
 import { PENDING_PURCHASE_REUSE_WINDOW_MS } from '../src/database/models/conventions';
 import { CategoryModel } from '../src/database/models/category.model';

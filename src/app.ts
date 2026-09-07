@@ -1,53 +1,30 @@
-import cookieParser from 'cookie-parser';
-import cors from 'cors';
-import express from 'express';
-import type { Express } from 'express';
-import helmet from 'helmet';
+/**
+ * Vercel Express entrypoint.
+ * Vercel auto-detects `src/app.ts` and requires a default-exported Express app
+ * (or a listen-based entry). Local long-running boot remains in `server.ts`.
+ *
+ * @see https://vercel.com/docs/frameworks/backend/express
+ */
+import { loadConfig } from './config/index';
+import { connectDatabase } from './database/index';
+import { createApp } from './create-app';
+import { getLogger } from './shared/logger/logger';
 
-import { getConfig } from './config/index';
-import { errorHandler } from './middleware/error-handler';
-import { notFoundHandler } from './middleware/not-found';
-import { requestIdMiddleware } from './middleware/request-id';
-import { requestLoggerMiddleware } from './middleware/request-logger';
-import { razorpayWebhookRouter } from './modules/payments/payment.routes';
-import { apiRouter } from './routes';
+loadConfig();
 
-export function createApp(): Express {
-  const config = getConfig();
-  const app = express();
+const app = createApp();
 
-  app.disable('x-powered-by');
-
-  app.use(helmet());
-  app.use(
-    cors({
-      origin: config.env.corsOrigin,
-      credentials: true,
-    }),
-  );
-
-  // Razorpay webhook must verify against the exact raw body bytes.
-  app.use(
-    '/webhooks/razorpay',
-    express.raw({ type: '*/*', limit: '1mb' }),
-    (req, _res, next) => {
-      req.rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(String(req.body ?? ''));
-      next();
+// Eager connect on instance start; request middleware also awaits connect if still pending.
+void connectDatabase().catch((error: unknown) => {
+  getLogger({ module: 'app' }).error(
+    {
+      err:
+        error instanceof Error
+          ? { name: error.name, message: error.message }
+          : { message: 'Unknown MongoDB bootstrap error' },
     },
-    requestIdMiddleware,
-    requestLoggerMiddleware,
-    razorpayWebhookRouter,
+    'MongoDB connect failed during Vercel app bootstrap',
   );
+});
 
-  app.use(express.json({ limit: '1mb' }));
-  app.use(cookieParser());
-  app.use(requestIdMiddleware);
-  app.use(requestLoggerMiddleware);
-
-  app.use(apiRouter);
-
-  app.use(notFoundHandler);
-  app.use(errorHandler);
-
-  return app;
-}
+export default app;

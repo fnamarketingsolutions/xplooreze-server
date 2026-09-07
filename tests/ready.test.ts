@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createApp } from '../src/app';
+import { createApp } from '../src/create-app';
 import { loadConfig, resetConfigForTests } from '../src/config/index';
 import * as database from '../src/database/index';
 import { resetLoggerForTests } from '../src/shared/logger/logger';

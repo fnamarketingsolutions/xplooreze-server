@@ -223,6 +223,12 @@ describe('configuration', () => {
     expect(defaults.cleanupEnabled).toBe(true);
     expect(defaults.cleanupIntervalMs).toBe(60 * 60 * 1000);
 
+    const onVercel = loadBlobConfig({
+      BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_test',
+      VERCEL: '1',
+    });
+    expect(onVercel.cleanupEnabled).toBe(false);
+
     const overridden = loadBlobConfig({
       BLOB_READ_WRITE_TOKEN: 'vercel_blob_rw_test',
       BLOB_CLEANUP_ENABLED: 'false',

@@ -2,7 +2,7 @@ import request from 'supertest';
 import { Types } from 'mongoose';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { createApp } from '../src/app';
+import { createApp } from '../src/create-app';
 import { loadConfig, resetConfigForTests } from '../src/config/index';
 import { QuestionModel } from '../src/database/models/question.model';
 import { TestSeriesModel } from '../src/database/models/test-series.model';

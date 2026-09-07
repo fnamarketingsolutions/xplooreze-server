@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createApp } from '../src/app';
+import { createApp } from '../src/create-app';
 import { loadConfig, resetConfigForTests } from '../src/config/index';
 import { UserModel } from '../src/database/models/user.model';
 import { userRepository } from '../src/database/repositories/user.repository';

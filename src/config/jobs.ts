@@ -1,3 +1,4 @@
+import { isVercelRuntime } from '../shared/runtime/vercel';
 import { optionalString } from './env-helpers';
 
 const DEFAULT_PURCHASE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
@@ -7,11 +8,15 @@ export type JobsConfig = {
   purchaseCleanupIntervalMs: number;
 };
 
-function parseCleanupEnabled(value: string | undefined): boolean {
+function parseCleanupEnabled(
+  value: string | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
   const raw = optionalString(value)?.toLowerCase();
 
   if (!raw) {
-    return true;
+    // In-process intervals do not run reliably on Vercel; default off there.
+    return !isVercelRuntime(env);
   }
 
   if (raw === 'true') {
@@ -45,7 +50,7 @@ function parseCleanupIntervalMs(value: string | undefined): number {
 
 export function loadJobsConfig(env: NodeJS.ProcessEnv = process.env): JobsConfig {
   return {
-    purchaseCleanupEnabled: parseCleanupEnabled(env.PURCHASE_CLEANUP_ENABLED),
+    purchaseCleanupEnabled: parseCleanupEnabled(env.PURCHASE_CLEANUP_ENABLED, env),
     purchaseCleanupIntervalMs: parseCleanupIntervalMs(env.PURCHASE_CLEANUP_INTERVAL_MS),
   };
 }

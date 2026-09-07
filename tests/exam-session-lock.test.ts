@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createApp } from '../src/app';
+import { createApp } from '../src/create-app';
 import { loadConfig, resetConfigForTests } from '../src/config/index';
 import { AttemptModel } from '../src/database/models/attempt.model';
 import { CategoryModel } from '../src/database/models/category.model';
