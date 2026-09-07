@@ -13,28 +13,58 @@ import {
 import type { ListOptions, SessionOption } from './types';
 
 export type EvaluatorCategoryAssignmentListFilter = {
-  evaluatorId?: string | Types.ObjectId;
-  categoryId?: string | Types.ObjectId;
+  evaluatorId?: string | Types.ObjectId | { $in: Array<string | Types.ObjectId> };
+  categoryId?: string | Types.ObjectId | { $in: Array<string | Types.ObjectId> };
   isActive?: boolean;
+  $or?: Array<Record<string, unknown>>;
 };
 
 function toObjectId(id: string | Types.ObjectId): Types.ObjectId {
   return id instanceof Types.ObjectId ? id : new Types.ObjectId(id);
 }
 
+function coerceIdFilter(
+  value: string | Types.ObjectId | { $in: Array<string | Types.ObjectId> },
+): Types.ObjectId | { $in: Types.ObjectId[] } {
+  if (typeof value === 'object' && value !== null && '$in' in value) {
+    return { $in: value.$in.map(toObjectId) };
+  }
+  return toObjectId(value);
+}
+
 function toMatch(filter: EvaluatorCategoryAssignmentListFilter): Record<string, unknown> {
   const match: Record<string, unknown> = {};
 
-  if (filter.evaluatorId) {
-    match.evaluatorId = toObjectId(filter.evaluatorId);
+  if (filter.evaluatorId !== undefined) {
+    match.evaluatorId = coerceIdFilter(filter.evaluatorId);
   }
 
-  if (filter.categoryId) {
-    match.categoryId = toObjectId(filter.categoryId);
+  if (filter.categoryId !== undefined) {
+    match.categoryId = coerceIdFilter(filter.categoryId);
   }
 
   if (filter.isActive !== undefined) {
     match.isActive = filter.isActive;
+  }
+
+  if (filter.$or && filter.$or.length > 0) {
+    match.$or = filter.$or.map((branch) => {
+      const next: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(branch)) {
+        if (
+          (key === 'evaluatorId' || key === 'categoryId') &&
+          value !== undefined &&
+          value !== null
+        ) {
+          next[key] = coerceIdFilter(
+            value as string | Types.ObjectId | { $in: Array<string | Types.ObjectId> },
+          );
+        } else {
+          next[key] = value;
+        }
+      }
+      return next;
+    });
   }
 
   return match;
@@ -75,7 +105,7 @@ export const evaluatorCategoryAssignmentRepository = {
   },
 
   list(filter: EvaluatorCategoryAssignmentListFilter, options?: ListOptions) {
-    return listDocuments(EvaluatorCategoryAssignmentModel, filter, options);
+    return listDocuments(EvaluatorCategoryAssignmentModel, toMatch(filter), options);
   },
 
   listByEvaluatorIds(
@@ -133,7 +163,7 @@ export const evaluatorCategoryAssignmentRepository = {
   },
 
   count(filter: EvaluatorCategoryAssignmentListFilter, options?: SessionOption) {
-    return countDocuments(EvaluatorCategoryAssignmentModel, filter, options);
+    return countDocuments(EvaluatorCategoryAssignmentModel, toMatch(filter), options);
   },
 
   create(data: object, options?: SessionOption) {

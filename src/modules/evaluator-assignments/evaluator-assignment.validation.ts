@@ -24,6 +24,7 @@ export type UpdateEvaluatorCategoryAssignmentInput = {
 export type EvaluatorCategoryAssignmentListQuery = {
   categoryId?: string;
   evaluatorId?: string;
+  search?: string;
 };
 
 export type GroupedEvaluatorCategoryAssignmentListQuery = EvaluatorCategoryAssignmentListQuery & {
@@ -82,9 +83,11 @@ export function parseEvaluatorCategoryAssignmentListQuery(
   query: object,
 ): EvaluatorCategoryAssignmentListQuery {
   const record = query as Record<string, unknown>;
+  const search = readQueryValue(record, 'search');
   return {
     categoryId: readOptionalObjectIdQuery(record, 'categoryId'),
     evaluatorId: readOptionalObjectIdQuery(record, 'evaluatorId'),
+    ...(search === undefined || search.trim() === '' ? {} : { search: search.trim() }),
   };
 }
 

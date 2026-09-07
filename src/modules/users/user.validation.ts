@@ -37,6 +37,7 @@ export type AdminUserListQuery = {
   ids?: string[];
   role?: UserRole;
   status?: UserStatus;
+  search?: string;
 };
 
 function validatePassword(password: string): void {
@@ -128,6 +129,7 @@ export function parseAdminUserListQuery(query: object): AdminUserListQuery {
   const ids = readObjectIdListQuery(record, 'ids');
   const role = readQueryValue(record, 'role');
   const status = readQueryValue(record, 'status');
+  const search = readQueryValue(record, 'search');
 
   return {
     ...(ids ? { ids } : {}),
@@ -137,6 +139,7 @@ export function parseAdminUserListQuery(query: object): AdminUserListQuery {
     ...(status === undefined || status.trim() === ''
       ? {}
       : { status: readUserStatus(status, 'status') }),
+    ...(search === undefined || search.trim() === '' ? {} : { search: search.trim() }),
   };
 }
 

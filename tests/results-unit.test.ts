@@ -97,6 +97,9 @@ describe('Phase 11 result unit rules', () => {
     expect(() => parseStudentResultListQuery({ $gt: '1' })).toThrow();
     expect(() => parseStudentResultListQuery({ unknown: 'x' })).toThrow();
     expect(() => parseAdminResultListQuery({ evaluationRevisionId: 'x' })).toThrow();
+    expect(parseAdminResultListQuery({ search: '  alice  ' })).toEqual({ search: 'alice' });
+    expect(parseAdminResultListQuery({ search: '' })).toEqual({});
+    expect(parseAdminResultListQuery({ page: '1', limit: '20' })).toEqual({});
     expect(() => parseEmptyResultBody({ score: 99 })).toThrow();
     expect(() => parseEmptyResultBody({ status: 'PUBLISHED' })).toThrow();
     expect(() => parseResultId('not-an-id')).toThrow();

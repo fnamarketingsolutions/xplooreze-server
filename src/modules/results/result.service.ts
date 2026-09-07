@@ -14,10 +14,12 @@ import {
   testSeriesRepository,
   userRepository,
 } from '../../database/repositories/index';
+import type { ResultListFilter } from '../../database/repositories/exam.repository';
 import { withTransaction } from '../../database/transactions';
 import type { PaginationInput } from '../../shared/http/pagination';
 import { toPaginationMeta } from '../../shared/http/pagination';
 import { AppError, ErrorCodes } from '../../shared/errors/app-error';
+import { resolveStudentOrTestSeriesSearch } from '../admin-list-search';
 import { toStudentAttemptDto } from '../attempts/attempt.dto';
 import { normalizeScore } from '../evaluations/evaluation-scoring';
 import { notifyResultPublished } from '../notifications/notification.service';
@@ -35,6 +37,7 @@ import {
   type ResultCatalogSummary,
   type StudentResultDetailDto,
 } from './result.dto';
+import type { AdminResultListQuery } from './result.validation';
 
 export type ResultActor = {
   userId: string;
@@ -432,17 +435,30 @@ export async function getStudentResult(
   };
 }
 
-export async function listAdminResults(pagination: PaginationInput) {
+export async function listAdminResults(
+  pagination: PaginationInput,
+  query: AdminResultListQuery = {},
+) {
+  let filter: ResultListFilter = {};
+
+  if (query.search) {
+    const resolved = await resolveStudentOrTestSeriesSearch(query.search);
+    if (resolved.kind === 'empty') {
+      return {
+        items: [],
+        pagination: toPaginationMeta(pagination, 0),
+      };
+    }
+    filter = { $or: resolved.$or };
+  }
+
   const [items, total] = await Promise.all([
-    resultRepository.list(
-      {},
-      {
-        skip: pagination.skip,
-        limit: pagination.limit,
-        sort: { createdAt: -1 },
-      },
-    ),
-    resultRepository.count({}),
+    resultRepository.list(filter, {
+      skip: pagination.skip,
+      limit: pagination.limit,
+      sort: { createdAt: -1 },
+    }),
+    resultRepository.count(filter),
   ]);
 
   return {

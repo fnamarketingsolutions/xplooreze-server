@@ -11,6 +11,7 @@ import {
 import type { PaginationInput } from '../../shared/http/pagination';
 import { toPaginationMeta } from '../../shared/http/pagination';
 import { AppError, ErrorCodes } from '../../shared/errors/app-error';
+import { resolveStudentOrTestSeriesSearch } from '../admin-list-search';
 import { buildTestSeriesSummaryByIds } from '../test-series/test-series-summary';
 import { toEntitlementDto } from './entitlement.dto';
 import type { EntitlementDto } from './entitlement.dto';
@@ -295,6 +296,18 @@ export async function listAdminEntitlements(
   query: AdminEntitlementListQuery = {},
 ) {
   const filter = toAdminEntitlementFilter(query);
+
+  if (query.search) {
+    const resolved = await resolveStudentOrTestSeriesSearch(query.search);
+    if (resolved.kind === 'empty') {
+      return {
+        items: [],
+        pagination: toPaginationMeta(pagination, 0),
+      };
+    }
+    filter.$or = resolved.$or;
+  }
+
   const [items, total] = await Promise.all([
     entitlementRepository.list(filter, {
       skip: pagination.skip,

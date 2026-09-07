@@ -23,6 +23,7 @@ export type AdminPurchaseListQuery = {
   status?: PurchaseStatus;
   createdFrom?: Date;
   createdTo?: Date;
+  search?: string;
 };
 
 function readPurchaseStatus(value: string, field: string): PurchaseStatus {
@@ -40,6 +41,7 @@ export function parseAdminPurchaseListQuery(query: object): AdminPurchaseListQue
   const status = readQueryValue(record, 'status');
   const createdFrom = readOptionalDateQuery(record, 'createdFrom');
   const createdTo = readOptionalDateQuery(record, 'createdTo');
+  const search = readQueryValue(record, 'search');
 
   if (createdFrom && createdTo && createdFrom.getTime() > createdTo.getTime()) {
     throw validationError({ createdFrom: 'Must not be after createdTo.' });
@@ -53,6 +55,7 @@ export function parseAdminPurchaseListQuery(query: object): AdminPurchaseListQue
       : { status: readPurchaseStatus(status.trim(), 'status') }),
     ...(createdFrom ? { createdFrom } : {}),
     ...(createdTo ? { createdTo } : {}),
+    ...(search === undefined || search.trim() === '' ? {} : { search: search.trim() }),
   };
 }
 

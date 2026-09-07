@@ -14,6 +14,7 @@ export type AdminEntitlementListQuery = {
   status?: EntitlementStatus;
   grantedFrom?: Date;
   grantedTo?: Date;
+  search?: string;
 };
 
 function readEntitlementStatus(value: string, field: string): EntitlementStatus {
@@ -31,6 +32,7 @@ export function parseAdminEntitlementListQuery(query: object): AdminEntitlementL
   const status = readQueryValue(record, 'status');
   const grantedFrom = readOptionalDateQuery(record, 'grantedFrom');
   const grantedTo = readOptionalDateQuery(record, 'grantedTo');
+  const search = readQueryValue(record, 'search');
 
   if (grantedFrom && grantedTo && grantedFrom.getTime() > grantedTo.getTime()) {
     throw validationError({ grantedFrom: 'Must not be after grantedTo.' });
@@ -44,6 +46,7 @@ export function parseAdminEntitlementListQuery(query: object): AdminEntitlementL
       : { status: readEntitlementStatus(status.trim(), 'status') }),
     ...(grantedFrom ? { grantedFrom } : {}),
     ...(grantedTo ? { grantedTo } : {}),
+    ...(search === undefined || search.trim() === '' ? {} : { search: search.trim() }),
   };
 }
 

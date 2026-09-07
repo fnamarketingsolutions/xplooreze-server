@@ -338,6 +338,7 @@ export type ResultListFilter = {
   studentId?: string | Types.ObjectId;
   testSeriesId?: string | Types.ObjectId;
   status?: string;
+  $or?: Array<Record<string, unknown>>;
 };
 
 export const resultRepository = {

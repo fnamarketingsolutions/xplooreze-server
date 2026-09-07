@@ -2,6 +2,7 @@ import type { Types } from 'mongoose';
 
 import type { UserRole, UserStatus } from '../models/enums';
 import { UserModel } from '../models/user.model';
+import { escapeRegex } from '../../shared/mongo/escape-regex';
 import {
   countDocuments,
   createDocument,
@@ -19,16 +20,25 @@ export type UserListFilter = {
   role?: UserRole;
   status?: UserStatus;
   ids?: Array<string | Types.ObjectId>;
+  /** Case-insensitive substring match on name.first, name.last, or email. */
+  textContains?: string;
 };
 
 function toUserQuery(filter: UserListFilter): Record<string, unknown> {
-  const { ids, ...rest } = filter;
-
-  return {
+  const { ids, textContains, ...rest } = filter;
+  const query: Record<string, unknown> = {
     ...rest,
     ...NOT_DELETED,
     ...(ids ? { _id: { $in: ids } } : {}),
   };
+
+  if (textContains && textContains.trim() !== '') {
+    const pattern = escapeRegex(textContains.trim());
+    const regex = { $regex: pattern, $options: 'i' };
+    query.$or = [{ 'name.first': regex }, { 'name.last': regex }, { email: regex }];
+  }
+
+  return query;
 }
 
 export const userRepository = {
@@ -50,6 +60,14 @@ export const userRepository = {
 
   list(filter: UserListFilter, options?: ListOptions) {
     return listDocuments(UserModel, toUserQuery(filter), options);
+  },
+
+  async listIds(filter: UserListFilter, options?: SessionOption) {
+    const docs = await withSession(
+      UserModel.find(toUserQuery(filter)).select('_id').lean(),
+      options?.session,
+    ).exec();
+    return docs.map((doc) => doc._id as Types.ObjectId);
   },
 
   count(filter: UserListFilter, options?: SessionOption) {

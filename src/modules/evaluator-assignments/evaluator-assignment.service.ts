@@ -2,6 +2,7 @@ import type { ClientSession } from 'mongoose';
 
 import { remapDuplicateKey } from '../../database/errors';
 import type { UserRole } from '../../database/models/enums';
+import type { EvaluatorCategoryAssignmentListFilter } from '../../database/repositories/assignments.repository';
 import {
   auditLogRepository,
   categoryRepository,
@@ -12,6 +13,7 @@ import { withTransaction } from '../../database/transactions';
 import type { PaginationInput } from '../../shared/http/pagination';
 import { toPaginationMeta } from '../../shared/http/pagination';
 import { AppError, ErrorCodes } from '../../shared/errors/app-error';
+import { resolveEvaluatorOrCategorySearch } from '../admin-list-search';
 import {
   toEvaluatorCategoryAssignmentDto,
   toEvaluatorCategoryAssignmentGrantDto,
@@ -140,14 +142,10 @@ async function toDto(
   );
 }
 
-export async function listEvaluatorCategoryAssignments(
-  query: EvaluatorCategoryAssignmentListQuery,
-  pagination: PaginationInput,
-) {
-  const filter: {
-    categoryId?: string;
-    evaluatorId?: string;
-  } = {};
+async function buildAssignmentMembershipFilter(
+  query: EvaluatorCategoryAssignmentListQuery & { isActive?: boolean },
+): Promise<EvaluatorCategoryAssignmentListFilter | 'empty'> {
+  const filter: EvaluatorCategoryAssignmentListFilter = {};
 
   if (query.categoryId) {
     filter.categoryId = query.categoryId;
@@ -155,6 +153,34 @@ export async function listEvaluatorCategoryAssignments(
 
   if (query.evaluatorId) {
     filter.evaluatorId = query.evaluatorId;
+  }
+
+  if (query.isActive !== undefined) {
+    filter.isActive = query.isActive;
+  }
+
+  if (query.search) {
+    const resolved = await resolveEvaluatorOrCategorySearch(query.search);
+    if (resolved.kind === 'empty') {
+      return 'empty';
+    }
+    filter.$or = resolved.$or;
+  }
+
+  return filter;
+}
+
+export async function listEvaluatorCategoryAssignments(
+  query: EvaluatorCategoryAssignmentListQuery,
+  pagination: PaginationInput,
+) {
+  const filter = await buildAssignmentMembershipFilter(query);
+
+  if (filter === 'empty') {
+    return {
+      items: [],
+      pagination: toPaginationMeta(pagination, 0),
+    };
   }
 
   const [items, total] = await Promise.all([
@@ -193,22 +219,13 @@ export async function listGroupedEvaluatorCategoryAssignments(
   query: GroupedEvaluatorCategoryAssignmentListQuery,
   pagination: PaginationInput,
 ) {
-  const membershipFilter: {
-    categoryId?: string;
-    evaluatorId?: string;
-    isActive?: boolean;
-  } = {};
+  const membershipFilter = await buildAssignmentMembershipFilter(query);
 
-  if (query.categoryId) {
-    membershipFilter.categoryId = query.categoryId;
-  }
-
-  if (query.evaluatorId) {
-    membershipFilter.evaluatorId = query.evaluatorId;
-  }
-
-  if (query.isActive !== undefined) {
-    membershipFilter.isActive = query.isActive;
+  if (membershipFilter === 'empty') {
+    return {
+      items: [],
+      pagination: toPaginationMeta(pagination, 0),
+    };
   }
 
   const { evaluatorIds, total } =

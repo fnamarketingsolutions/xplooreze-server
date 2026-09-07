@@ -5,6 +5,7 @@ import { CategoryModel } from '../models/category.model';
 import { ModuleModel } from '../models/module.model';
 import { QuestionModel } from '../models/question.model';
 import { TestSeriesModel } from '../models/test-series.model';
+import { escapeRegex } from '../../shared/mongo/escape-regex';
 import {
   countDocuments,
   createDocument,
@@ -18,13 +19,21 @@ import type { ListOptions, SessionOption } from './types';
 
 const NOT_DELETED = { deletedAt: null } as const;
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 export type CategoryListFilter = {
   status?: CatalogStatus;
+  nameContains?: string;
 };
+
+function toCategoryQuery(filter: CategoryListFilter): Record<string, unknown> {
+  const { nameContains, ...rest } = filter;
+  const query: Record<string, unknown> = { ...rest, ...NOT_DELETED };
+
+  if (nameContains && nameContains.trim() !== '') {
+    query.name = { $regex: escapeRegex(nameContains.trim()), $options: 'i' };
+  }
+
+  return query;
+}
 
 export type ModuleListFilter = {
   status?: CatalogStatus;
@@ -77,11 +86,19 @@ export const categoryRepository = {
   },
 
   list(filter: CategoryListFilter, options?: ListOptions) {
-    return listDocuments(CategoryModel, { ...filter, ...NOT_DELETED }, options);
+    return listDocuments(CategoryModel, toCategoryQuery(filter), options);
+  },
+
+  async listIds(filter: CategoryListFilter, options?: SessionOption) {
+    const docs = await withSession(
+      CategoryModel.find(toCategoryQuery(filter)).select('_id').lean(),
+      options?.session,
+    ).exec();
+    return docs.map((doc) => doc._id as Types.ObjectId);
   },
 
   count(filter: CategoryListFilter, options?: SessionOption) {
-    return countDocuments(CategoryModel, { ...filter, ...NOT_DELETED }, options);
+    return countDocuments(CategoryModel, toCategoryQuery(filter), options);
   },
 
   create(data: object, options?: SessionOption) {
@@ -157,6 +174,14 @@ export const testSeriesRepository = {
 
   list(filter: TestSeriesListFilter, options?: ListOptions) {
     return listDocuments(TestSeriesModel, toTestSeriesQuery(filter), options);
+  },
+
+  async listIds(filter: TestSeriesListFilter, options?: SessionOption) {
+    const docs = await withSession(
+      TestSeriesModel.find(toTestSeriesQuery(filter)).select('_id').lean(),
+      options?.session,
+    ).exec();
+    return docs.map((doc) => doc._id as Types.ObjectId);
   },
 
   count(filter: TestSeriesListFilter, options?: SessionOption) {

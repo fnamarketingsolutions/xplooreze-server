@@ -242,6 +242,31 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
       expect(combined.body.pagination).toMatchObject({ total: 0 });
       expect(combined.body.data).toEqual([]);
 
+      const byName = await request(app)
+        .get('/admin/users?search=Stu')
+        .set(bearer(adminToken));
+      expect(byName.status).toBe(200);
+      expect(byName.body.pagination).toMatchObject({ total: 1 });
+      expect(byName.body.data).toEqual([
+        expect.objectContaining({ email: 'student@example.com' }),
+      ]);
+
+      const byEmail = await request(app)
+        .get('/admin/users?search=evaluator@')
+        .set(bearer(adminToken));
+      expect(byEmail.status).toBe(200);
+      expect(byEmail.body.pagination).toMatchObject({ total: 1 });
+      expect(byEmail.body.data).toEqual([
+        expect.objectContaining({ email: 'evaluator@example.com' }),
+      ]);
+
+      const noMatch = await request(app)
+        .get('/admin/users?search=zzznomatch')
+        .set(bearer(adminToken));
+      expect(noMatch.status).toBe(200);
+      expect(noMatch.body.pagination).toMatchObject({ total: 0 });
+      expect(noMatch.body.data).toEqual([]);
+
       // Empty filter values behave as "no filter" so the UI can send blank selects.
       const unfiltered = await request(app)
         .get('/admin/users?role=&status=')

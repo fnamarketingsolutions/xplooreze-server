@@ -77,6 +77,7 @@ export async function listAdminUsers(
     ...(query.ids ? { ids: query.ids } : {}),
     ...(query.role ? { role: query.role } : {}),
     ...(query.status ? { status: query.status } : {}),
+    ...(query.search ? { textContains: query.search } : {}),
   };
   const [items, total] = await Promise.all([
     userRepository.list(filter, {

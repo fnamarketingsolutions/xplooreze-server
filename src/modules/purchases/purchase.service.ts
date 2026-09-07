@@ -7,6 +7,7 @@ import type { PaginationInput } from '../../shared/http/pagination';
 import { toPaginationMeta } from '../../shared/http/pagination';
 import { AppError, ErrorCodes } from '../../shared/errors/app-error';
 import { getLogger } from '../../shared/logger/logger';
+import { resolveStudentOrTestSeriesSearch } from '../admin-list-search';
 import { findValidActiveEntitlement } from '../entitlements/entitlement.service';
 import { buildTestSeriesSummaryByIds } from '../test-series/test-series-summary';
 import { V1_CURRENCY } from '../test-series/test-series.validation';
@@ -318,6 +319,18 @@ export async function listAdminPurchases(
   query: AdminPurchaseListQuery = {},
 ) {
   const filter = toAdminPurchaseFilter(query);
+
+  if (query.search) {
+    const resolved = await resolveStudentOrTestSeriesSearch(query.search);
+    if (resolved.kind === 'empty') {
+      return {
+        items: [],
+        pagination: toPaginationMeta(pagination, 0),
+      };
+    }
+    filter.$or = resolved.$or;
+  }
+
   const [items, total] = await Promise.all([
     purchaseRepository.list(filter, {
       skip: pagination.skip,

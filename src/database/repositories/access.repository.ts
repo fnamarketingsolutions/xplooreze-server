@@ -22,6 +22,7 @@ export type PurchaseListFilter = {
   testSeriesId?: string | Types.ObjectId;
   status?: string;
   createdAt?: DateRangeFilter;
+  $or?: Array<Record<string, unknown>>;
 };
 
 export type EntitlementListFilter = {
@@ -29,6 +30,7 @@ export type EntitlementListFilter = {
   testSeriesId?: string | Types.ObjectId;
   status?: string;
   grantedAt?: DateRangeFilter;
+  $or?: Array<Record<string, unknown>>;
 };
 
 export const purchaseRepository = {

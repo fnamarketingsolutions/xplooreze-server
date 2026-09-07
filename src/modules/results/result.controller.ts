@@ -52,9 +52,9 @@ export async function getStudentResultController(req: Request, res: Response): P
 }
 
 export async function listAdminResultsController(req: Request, res: Response): Promise<void> {
-  parseAdminResultListQuery(req.query as Record<string, unknown>);
+  const query = parseAdminResultListQuery(req.query as Record<string, unknown>);
   parseEmptyResultBody(req.body);
-  const result = await listAdminResults(parsePagination(req.query));
+  const result = await listAdminResults(parsePagination(req.query), query);
 
   res.status(200).json({
     success: true,

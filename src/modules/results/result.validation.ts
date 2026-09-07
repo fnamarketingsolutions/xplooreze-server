@@ -8,7 +8,7 @@ import {
 
 const EMPTY_BODY_FIELDS = [] as const;
 const STUDENT_LIST_QUERY_FIELDS = ['page', 'limit'] as const;
-const ADMIN_LIST_QUERY_FIELDS = ['page', 'limit'] as const;
+const ADMIN_LIST_QUERY_FIELDS = ['page', 'limit', 'search'] as const;
 
 const FORBIDDEN_CLIENT_FIELDS = [
   'studentId',
@@ -21,6 +21,10 @@ const FORBIDDEN_CLIENT_FIELDS = [
   'status',
   'publishedAt',
 ] as const;
+
+export type AdminResultListQuery = {
+  search?: string;
+};
 
 export function parseResultId(value: string | string[] | undefined): string {
   return readRouteParam(value, 'resultId');
@@ -62,7 +66,7 @@ export function parseStudentResultListQuery(query: object): void {
   }
 }
 
-export function parseAdminResultListQuery(query: object): void {
+export function parseAdminResultListQuery(query: object): AdminResultListQuery {
   const record = query as Record<string, unknown>;
   rejectOperatorKeys(record);
   rejectForbiddenClientFields(record);
@@ -71,4 +75,9 @@ export function parseAdminResultListQuery(query: object): void {
   for (const field of ADMIN_LIST_QUERY_FIELDS) {
     readQueryValue(record, field);
   }
+
+  const search = readQueryValue(record, 'search');
+  return {
+    ...(search === undefined || search.trim() === '' ? {} : { search: search.trim() }),
+  };
 }
