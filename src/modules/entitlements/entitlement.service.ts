@@ -15,7 +15,7 @@ import { resolveStudentOrTestSeriesSearch } from '../admin-list-search';
 import { buildTestSeriesSummaryByIds } from '../test-series/test-series-summary';
 import { toEntitlementDto } from './entitlement.dto';
 import type { EntitlementDto } from './entitlement.dto';
-import type { AdminEntitlementListQuery } from './entitlement.validation';
+import type { AdminEntitlementListQuery, StudentEntitlementListQuery } from './entitlement.validation';
 
 function entitlementNotFound(): AppError {
   return new AppError({
@@ -245,13 +245,22 @@ export async function ensureFreeMcqEntitlement(studentId: string, testSeriesId: 
   }
 }
 
-export async function listStudentEntitlements(studentId: string, pagination: PaginationInput) {
-  const filter = { studentId };
+export async function listStudentEntitlements(
+  studentId: string,
+  pagination: PaginationInput,
+  query: StudentEntitlementListQuery = {},
+) {
+  const purchasedOnly = query.purchased === true;
+  const filter: EntitlementListFilter = {
+    studentId,
+    ...(purchasedOnly ? { purchaseId: { $ne: null } } : {}),
+  };
   const [items, total] = await Promise.all([
     entitlementRepository.list(filter, {
       skip: pagination.skip,
       limit: pagination.limit,
-      sort: { createdAt: -1 },
+      // Purchased wallet: usable grants first, then expired, then revoked.
+      sort: purchasedOnly ? { status: 1, createdAt: -1 } : { createdAt: -1 },
     }),
     entitlementRepository.count(filter),
   ]);

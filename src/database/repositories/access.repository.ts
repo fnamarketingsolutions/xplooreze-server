@@ -30,6 +30,7 @@ export type EntitlementListFilter = {
   testSeriesId?: string | Types.ObjectId;
   status?: string;
   grantedAt?: DateRangeFilter;
+  purchaseId?: { $ne: null };
   $or?: Array<Record<string, unknown>>;
 };
 

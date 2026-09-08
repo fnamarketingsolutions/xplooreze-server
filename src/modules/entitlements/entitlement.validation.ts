@@ -8,6 +8,10 @@ import {
   validationError,
 } from '../../shared/validation/http';
 
+export type StudentEntitlementListQuery = {
+  purchased?: boolean;
+};
+
 export type AdminEntitlementListQuery = {
   studentId?: string;
   testSeriesId?: string;
@@ -47,6 +51,36 @@ export function parseAdminEntitlementListQuery(query: object): AdminEntitlementL
     ...(grantedFrom ? { grantedFrom } : {}),
     ...(grantedTo ? { grantedTo } : {}),
     ...(search === undefined || search.trim() === '' ? {} : { search: search.trim() }),
+  };
+}
+
+function readOptionalBooleanQuery(
+  query: Record<string, unknown>,
+  field: string,
+): boolean | undefined {
+  const value = readQueryValue(query, field);
+
+  if (value === undefined || value.trim() === '') {
+    return undefined;
+  }
+
+  if (value === 'true') {
+    return true;
+  }
+
+  if (value === 'false') {
+    return false;
+  }
+
+  throw validationError({ [field]: 'Must be true or false.' });
+}
+
+/** My Access uses `purchased=true`. Default list still includes free MCQ entitlements. */
+export function parseStudentEntitlementListQuery(query: object): StudentEntitlementListQuery {
+  const purchased = readOptionalBooleanQuery(query as Record<string, unknown>, 'purchased');
+
+  return {
+    ...(purchased === undefined ? {} : { purchased }),
   };
 }
 

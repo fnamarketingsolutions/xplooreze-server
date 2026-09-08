@@ -917,6 +917,49 @@ describe('Phase 7 purchases, entitlements, and Razorpay', () => {
       expect(detail.body.data.attempts).toEqual({ used: 1, max: 3, remaining: 2 });
     });
 
+    it('purchased=true lists only purchase-backed entitlements, active first', async () => {
+      const app = createApp();
+      const studentToken = await login(app, 'student@example.com');
+      const { mcq, pdf, editor } = await seedCatalog(app);
+      const student = await userRepository.findByEmail('student@example.com');
+      const grantedAt = new Date();
+
+      await ensureFreeMcqEntitlement(student!._id.toString(), mcq.id);
+
+      const expiredPaid = await EntitlementModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        purchaseId: new Types.ObjectId(),
+        status: 'EXPIRED',
+        grantedAt,
+        expiresAt: addDays(grantedAt, PAID_ENTITLEMENT_VALIDITY_DAYS),
+      });
+
+      const activePaid = await EntitlementModel.create({
+        studentId: student!._id,
+        testSeriesId: editor.id,
+        purchaseId: new Types.ObjectId(),
+        status: 'ACTIVE',
+        grantedAt,
+        expiresAt: addDays(grantedAt, PAID_ENTITLEMENT_VALIDITY_DAYS),
+      });
+
+      const filtered = await request(app)
+        .get('/me/entitlements')
+        .query({ purchased: 'true' })
+        .set(bearer(studentToken));
+
+      expect(filtered.status).toBe(200);
+      expect(filtered.body.data.map((item: { id: string }) => item.id)).toEqual([
+        activePaid._id.toString(),
+        expiredPaid._id.toString(),
+      ]);
+      expect(filtered.body.pagination.total).toBe(2);
+
+      const all = await request(app).get('/me/entitlements').set(bearer(studentToken));
+      expect(all.body.data).toHaveLength(3);
+    });
+
     it('rejects student entitlement mutation attempts', async () => {
       const app = createApp();
       const studentToken = await login(app, 'student@example.com');

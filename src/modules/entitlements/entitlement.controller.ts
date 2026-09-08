@@ -8,7 +8,11 @@ import {
   listAdminEntitlements,
   listStudentEntitlements,
 } from './entitlement.service';
-import { parseAdminEntitlementListQuery, parseEntitlementId } from './entitlement.validation';
+import {
+  parseAdminEntitlementListQuery,
+  parseEntitlementId,
+  parseStudentEntitlementListQuery,
+} from './entitlement.validation';
 
 function requireAuthUserId(req: Request): string {
   if (!req.auth) {
@@ -24,7 +28,11 @@ function requireAuthUserId(req: Request): string {
 
 export async function listEntitlementsController(req: Request, res: Response): Promise<void> {
   const studentId = requireAuthUserId(req);
-  const result = await listStudentEntitlements(studentId, parsePagination(req.query));
+  const result = await listStudentEntitlements(
+    studentId,
+    parsePagination(req.query),
+    parseStudentEntitlementListQuery(req.query),
+  );
 
   res.status(200).json({
     success: true,
