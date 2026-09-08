@@ -59,6 +59,16 @@ export const attemptRepository = {
     return withSession(AttemptModel.countDocuments({ entitlementId }), options?.session).exec();
   },
 
+  countOpenByEntitlementId(entitlementId: string | Types.ObjectId, options?: SessionOption) {
+    return withSession(
+      AttemptModel.countDocuments({
+        entitlementId,
+        status: { $in: ['IN_PROGRESS', 'UPLOAD_PENDING'] },
+      }),
+      options?.session,
+    ).exec();
+  },
+
   async countByEntitlementIds(entitlementIds: (string | Types.ObjectId)[]) {
     if (entitlementIds.length === 0) {
       return new Map<string, number>();

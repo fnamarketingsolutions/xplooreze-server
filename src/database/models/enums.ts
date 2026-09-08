@@ -13,7 +13,7 @@ export type TestSeriesType = (typeof TEST_SERIES_TYPES)[number];
 export const PURCHASE_STATUSES = ['PENDING', 'PAID', 'FAILED'] as const;
 export type PurchaseStatus = (typeof PURCHASE_STATUSES)[number];
 
-export const ENTITLEMENT_STATUSES = ['ACTIVE', 'EXPIRED', 'REVOKED'] as const;
+export const ENTITLEMENT_STATUSES = ['ACTIVE', 'EXPIRED', 'CONSUMED', 'REVOKED'] as const;
 export type EntitlementStatus = (typeof ENTITLEMENT_STATUSES)[number];
 
 export const ATTEMPT_STATUSES = [

@@ -433,15 +433,87 @@ describe('Phase 8 Attempt Engine', () => {
         expect(submitted.status).toBe(200);
       }
 
+      const consumed = await EntitlementModel.findOne({ studentId, testSeriesId: catalog.editor.id });
+      expect(consumed?.status).toBe('CONSUMED');
+      expect(consumed?.expiresAt?.getTime()).toBeGreaterThan(Date.now());
+
       const fourth = await request(app)
         .post('/attempts')
         .set(bearer(studentToken))
         .send({ testSeriesId: catalog.editor.id });
-      expect(fourth.status).toBe(409);
-      expect(fourth.body.error.code).toBe(ErrorCodes.ATTEMPT_LIMIT_EXCEEDED);
+      expect(fourth.status).toBe(403);
+      expect(fourth.body.error.code).toBe(ErrorCodes.ENTITLEMENT_REQUIRED);
 
       const count = await AttemptModel.countDocuments({ testSeriesId: catalog.editor.id });
       expect(count).toBe(3);
+    });
+
+    it('does not consume a paid entitlement while the third attempt is still open', async () => {
+      const app = createApp();
+      const catalog = await seedCatalog(app);
+      const studentToken = await login(app, 'student@example.com');
+      const studentId = await studentIdFor('student@example.com');
+      const first = await grantPaidEntitlement(studentId, catalog.editor.id);
+
+      for (let number = 1; number <= 2; number += 1) {
+        const started = await request(app)
+          .post('/attempts')
+          .set(bearer(studentToken))
+          .send({ testSeriesId: catalog.editor.id });
+        expect(started.status).toBe(201);
+        const submitted = await request(app)
+          .post(`/attempts/${started.body.data.id}/submit`)
+          .set(bearer(studentToken));
+        expect(submitted.status).toBe(200);
+      }
+
+      const third = await request(app)
+        .post('/attempts')
+        .set(bearer(studentToken))
+        .send({ testSeriesId: catalog.editor.id });
+      expect(third.status).toBe(201);
+
+      const stored = await EntitlementModel.findById(first._id);
+      expect(stored?.status).toBe('ACTIVE');
+    });
+
+    it('grants a fresh set of attempts on repurchase after the entitlement is consumed', async () => {
+      const app = createApp();
+      const catalog = await seedCatalog(app);
+      const studentToken = await login(app, 'student@example.com');
+      const studentId = await studentIdFor('student@example.com');
+      const first = await grantPaidEntitlement(studentId, catalog.editor.id);
+      const originalExpiresAt = first.expiresAt!.getTime();
+
+      for (let number = 1; number <= 3; number += 1) {
+        const started = await request(app)
+          .post('/attempts')
+          .set(bearer(studentToken))
+          .send({ testSeriesId: catalog.editor.id });
+        expect(started.status).toBe(201);
+
+        const submitted = await request(app)
+          .post(`/attempts/${started.body.data.id}/submit`)
+          .set(bearer(studentToken));
+        expect(submitted.status).toBe(200);
+      }
+
+      const consumed = await EntitlementModel.findById(first._id);
+      expect(consumed?.status).toBe('CONSUMED');
+      expect(consumed?.expiresAt?.getTime()).toBe(originalExpiresAt);
+
+      const repurchased = await grantPaidEntitlement(studentId, catalog.editor.id);
+      const fresh = await request(app)
+        .post('/attempts')
+        .set(bearer(studentToken))
+        .send({ testSeriesId: catalog.editor.id });
+      expect(fresh.status).toBe(201);
+      expect(fresh.body.data.attemptNumber).toBe(1);
+
+      const stored = await AttemptModel.findById(fresh.body.data.id);
+      expect(stored!.entitlementId.toString()).toBe(repurchased._id.toString());
+      expect(await AttemptModel.countDocuments({ entitlementId: first._id })).toBe(3);
+      expect((await EntitlementModel.findById(first._id))?.status).toBe('CONSUMED');
     });
 
     it('grants a fresh set of attempts on repurchase after the entitlement expires', async () => {
@@ -469,8 +541,8 @@ describe('Phase 8 Attempt Engine', () => {
         .post('/attempts')
         .set(bearer(studentToken))
         .send({ testSeriesId: catalog.editor.id });
-      expect(exhausted.status).toBe(409);
-      expect(exhausted.body.error.code).toBe(ErrorCodes.ATTEMPT_LIMIT_EXCEEDED);
+      expect(exhausted.status).toBe(403);
+      expect(exhausted.body.error.code).toBe(ErrorCodes.ENTITLEMENT_REQUIRED);
 
       await EntitlementModel.findByIdAndUpdate(first._id, {
         status: 'EXPIRED',

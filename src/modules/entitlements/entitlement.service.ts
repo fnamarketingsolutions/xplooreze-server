@@ -98,6 +98,43 @@ export async function findValidActiveEntitlement(
 }
 
 /**
+ * Paid PDF/EDITOR only. ACTIVE → CONSUMED when the attempt cap is spent and no
+ * attempt on this entitlement is still open. Does not change expiresAt.
+ * Free MCQ (null expiresAt) is never consumed. Idempotent if already not ACTIVE.
+ */
+export async function consumePaidEntitlementIfAttemptsExhausted(
+  entitlementId: string,
+  session?: ClientSession,
+): Promise<boolean> {
+  const options = session ? { session } : undefined;
+  const entitlement = await entitlementRepository.findById(entitlementId, options);
+
+  if (!entitlement || entitlement.status !== 'ACTIVE' || entitlement.expiresAt == null) {
+    return false;
+  }
+
+  const used = await attemptRepository.countByEntitlementId(entitlementId, options);
+
+  if (used < V1_MAX_ATTEMPTS) {
+    return false;
+  }
+
+  const open = await attemptRepository.countOpenByEntitlementId(entitlementId, options);
+
+  if (open > 0) {
+    return false;
+  }
+
+  const updated = await entitlementRepository.updateById(
+    entitlementId,
+    { $set: { status: 'CONSUMED' } },
+    options,
+  );
+
+  return updated?.status === 'CONSUMED';
+}
+
+/**
  * Access check for later Attempt phase.
  * Paid: ACTIVE entitlement and expiresAt > now.
  * Free MCQ: access without purchase; ACTIVE entitlement is not expiry-gated.
@@ -259,7 +296,8 @@ export async function listStudentEntitlements(
     entitlementRepository.list(filter, {
       skip: pagination.skip,
       limit: pagination.limit,
-      // Purchased wallet: usable grants first, then expired, then revoked.
+      // Purchased wallet: ACTIVE, then CONSUMED, then EXPIRED, then REVOKED
+      // (string order), newest createdAt within each status.
       sort: purchasedOnly ? { status: 1, createdAt: -1 } : { createdAt: -1 },
     }),
     entitlementRepository.count(filter),

@@ -8,7 +8,10 @@ import { toPaginationMeta } from '../../shared/http/pagination';
 import { AppError, ErrorCodes } from '../../shared/errors/app-error';
 import { getLogger } from '../../shared/logger/logger';
 import { resolveStudentOrTestSeriesSearch } from '../admin-list-search';
-import { findValidActiveEntitlement } from '../entitlements/entitlement.service';
+import {
+  consumePaidEntitlementIfAttemptsExhausted,
+  findValidActiveEntitlement,
+} from '../entitlements/entitlement.service';
 import { buildTestSeriesSummaryByIds } from '../test-series/test-series-summary';
 import { V1_CURRENCY } from '../test-series/test-series.validation';
 import { renderPurchaseReceiptPdf } from './purchase-receipt.pdf';
@@ -55,6 +58,25 @@ function purchaseNotResumable(message: string): AppError {
     code: ErrorCodes.TEST_SERIES_NOT_PURCHASABLE,
     message,
   });
+}
+
+/**
+ * An unexpired ACTIVE entitlement blocks purchase unless the paid attempt cap
+ * is already spent and no attempt is still open. In that case close it as
+ * CONSUMED so repurchase can grant a new entitlement.
+ */
+async function rejectUnlessConsumedAccess(studentId: string, testSeriesId: string) {
+  const existingAccess = await findValidActiveEntitlement(studentId, testSeriesId);
+
+  if (!existingAccess) {
+    return;
+  }
+
+  const consumed = await consumePaidEntitlementIfAttemptsExhausted(existingAccess._id.toString());
+
+  if (!consumed) {
+    throw purchaseAlreadyOwned();
+  }
 }
 
 export function isPendingPurchaseReusable(createdAt: Date | undefined, now = new Date()): boolean {
@@ -125,10 +147,7 @@ export async function createPaidPurchase(
     throw notPurchasable('Test series does not have a valid purchase price.');
   }
 
-  const existingAccess = await findValidActiveEntitlement(studentId, input.testSeriesId);
-  if (existingAccess) {
-    throw purchaseAlreadyOwned();
-  }
+  await rejectUnlessConsumedAccess(studentId, input.testSeriesId);
 
   const pending = await purchaseRepository.findPendingByStudentAndTestSeries(
     studentId,
@@ -299,13 +318,7 @@ export async function getStudentPendingPurchaseCheckout(
     throw purchaseNotResumable('Purchase is missing a payment order and cannot be resumed.');
   }
 
-  const existingAccess = await findValidActiveEntitlement(
-    studentId,
-    purchase.testSeriesId.toString(),
-  );
-  if (existingAccess) {
-    throw purchaseAlreadyOwned();
-  }
+  await rejectUnlessConsumedAccess(studentId, purchase.testSeriesId.toString());
 
   return toCheckoutDto(purchase);
 }

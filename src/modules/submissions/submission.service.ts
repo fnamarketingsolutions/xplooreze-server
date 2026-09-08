@@ -32,6 +32,7 @@ import {
   verifyUploadedSubmissionObject,
 } from '../files/file.service';
 import { toStudentSubmissionFileDto, type PdfUploadAuthorizationDto } from '../files/file.dto';
+import { consumePaidEntitlementIfAttemptsExhausted } from '../entitlements/entitlement.service';
 import { notifyAttemptSubmitted } from '../notifications/notification.service';
 import type { RequestPdfUploadInput } from './submission.validation';
 
@@ -134,9 +135,11 @@ async function expirePdfUploadWindowIfNeeded(
     return attempt;
   }
 
-  return attemptRepository.updateById(attempt._id, {
+  const expired = await attemptRepository.updateById(attempt._id, {
     $set: { status: 'EXPIRED', ...examSessionClearFields() },
   });
+  await consumePaidEntitlementIfAttemptsExhausted(attempt.entitlementId.toString());
+  return expired;
 }
 
 async function ensurePdfUploadPending(
@@ -458,6 +461,7 @@ export async function finalizePdfAttempt(
 
   if (attempt.status === 'SUBMITTED') {
     const existing = await submissionRepository.findByAttemptId(attemptId);
+    await consumePaidEntitlementIfAttemptsExhausted(attempt.entitlementId.toString());
     return submittedResponse(
       attemptId,
       existing?._id.toString() ?? '',
@@ -473,6 +477,7 @@ export async function finalizePdfAttempt(
 
   if (ready.status === 'SUBMITTED') {
     const existing = await submissionRepository.findByAttemptId(attemptId);
+    await consumePaidEntitlementIfAttemptsExhausted(ready.entitlementId.toString());
     return submittedResponse(
       attemptId,
       existing?._id.toString() ?? '',
@@ -524,6 +529,7 @@ export async function finalizePdfAttempt(
 
       if (fresh.status === 'SUBMITTED') {
         const existing = await submissionRepository.findByAttemptId(attemptId, { session });
+        await consumePaidEntitlementIfAttemptsExhausted(fresh.entitlementId.toString(), session);
         return {
           dto: submittedResponse(
             attemptId,
@@ -577,6 +583,7 @@ export async function finalizePdfAttempt(
         },
         { session },
       );
+      await consumePaidEntitlementIfAttemptsExhausted(fresh.entitlementId.toString(), session);
 
       return {
         dto: submittedResponse(attemptId, submission._id.toString(), now),

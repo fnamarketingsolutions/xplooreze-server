@@ -125,7 +125,7 @@ describe('schema enums and statuses', () => {
       'EXPIRED',
       'CANCELLED',
     ]);
-    expect(ENTITLEMENT_STATUSES).toEqual(['ACTIVE', 'EXPIRED', 'REVOKED']);
+    expect(ENTITLEMENT_STATUSES).toEqual(['ACTIVE', 'EXPIRED', 'CONSUMED', 'REVOKED']);
     expect(EVALUATION_MODES).toEqual(['AUTOMATIC', 'MANUAL']);
     expect(EVALUATION_STATUSES).toEqual([
       'UNASSIGNED',
@@ -147,7 +147,7 @@ describe('schema enums and statuses', () => {
     expect(PURCHASE_STATUSES).not.toContain('REFUNDED');
     expect(PURCHASE_STATUSES).not.toContain('CANCELLED');
     expect(PURCHASE_STATUSES).not.toContain('EXPIRED');
-    expect(ENTITLEMENT_STATUSES).toEqual(['ACTIVE', 'EXPIRED', 'REVOKED']);
+    expect(ENTITLEMENT_STATUSES).toEqual(['ACTIVE', 'EXPIRED', 'CONSUMED', 'REVOKED']);
 
     for (const status of PURCHASE_STATUSES) {
       const purchase = new PurchaseModel({

@@ -454,6 +454,123 @@ describe('Phase 7 purchases, entitlements, and Razorpay', () => {
       expect(repurchase.body.data.razorpayOrderId).toBe('order_repurchase');
     });
 
+    it('allows repurchase when paid attempts are exhausted and leaves expiresAt unchanged', async () => {
+      const app = createApp();
+      const studentToken = await login(app, 'student@example.com');
+      const student = await userRepository.findByEmail('student@example.com');
+      const { pdf } = await seedCatalog(app);
+
+      const grantedAt = new Date();
+      const expiresAt = addDays(grantedAt, PAID_ENTITLEMENT_VALIDITY_DAYS);
+      const entitlement = await EntitlementModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        purchaseId: new Types.ObjectId(),
+        status: 'ACTIVE',
+        grantedAt,
+        expiresAt,
+      });
+
+      const startedAt = new Date();
+      await AttemptModel.insertMany(
+        [1, 2, 3].map((attemptNumber) => ({
+          studentId: student!._id,
+          testSeriesId: pdf.id,
+          entitlementId: entitlement._id,
+          status: 'SUBMITTED',
+          startedAt,
+          examEndsAt: addDays(startedAt, 1),
+          submittedAt: startedAt,
+          attemptNumber,
+          version: 1,
+          configurationSnapshot: { duration: 3600, maxScore: 100 },
+        })),
+      );
+
+      createOrderMock.mockResolvedValue({
+        id: 'order_consumed',
+        amount: PRICE_PAISE,
+        currency: 'INR',
+      });
+
+      const repurchase = await request(app)
+        .post('/purchases')
+        .set(purchaseHeaders(studentToken))
+        .send({ testSeriesId: pdf.id });
+
+      expect(repurchase.status).toBe(201);
+      expect(repurchase.body.data.razorpayOrderId).toBe('order_consumed');
+
+      const consumed = await EntitlementModel.findById(entitlement._id);
+      expect(consumed?.status).toBe('CONSUMED');
+      expect(consumed?.expiresAt?.getTime()).toBe(expiresAt.getTime());
+    });
+
+    it('still blocks repurchase while a paid attempt is open even if three attempts exist', async () => {
+      const app = createApp();
+      const studentToken = await login(app, 'student@example.com');
+      const student = await userRepository.findByEmail('student@example.com');
+      const { pdf } = await seedCatalog(app);
+
+      const grantedAt = new Date();
+      const entitlement = await EntitlementModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        purchaseId: new Types.ObjectId(),
+        status: 'ACTIVE',
+        grantedAt,
+        expiresAt: addDays(grantedAt, PAID_ENTITLEMENT_VALIDITY_DAYS),
+      });
+
+      const startedAt = new Date();
+      await AttemptModel.insertMany([
+        {
+          studentId: student!._id,
+          testSeriesId: pdf.id,
+          entitlementId: entitlement._id,
+          status: 'SUBMITTED',
+          startedAt,
+          examEndsAt: addDays(startedAt, 1),
+          submittedAt: startedAt,
+          attemptNumber: 1,
+          version: 1,
+          configurationSnapshot: { duration: 3600, maxScore: 100 },
+        },
+        {
+          studentId: student!._id,
+          testSeriesId: pdf.id,
+          entitlementId: entitlement._id,
+          status: 'SUBMITTED',
+          startedAt,
+          examEndsAt: addDays(startedAt, 1),
+          submittedAt: startedAt,
+          attemptNumber: 2,
+          version: 1,
+          configurationSnapshot: { duration: 3600, maxScore: 100 },
+        },
+        {
+          studentId: student!._id,
+          testSeriesId: pdf.id,
+          entitlementId: entitlement._id,
+          status: 'IN_PROGRESS',
+          startedAt,
+          examEndsAt: addDays(startedAt, 1),
+          attemptNumber: 3,
+          version: 1,
+          configurationSnapshot: { duration: 3600, maxScore: 100 },
+        },
+      ]);
+
+      const blocked = await request(app)
+        .post('/purchases')
+        .set(purchaseHeaders(studentToken))
+        .send({ testSeriesId: pdf.id });
+
+      expect(blocked.status).toBe(409);
+      expect(blocked.body.error.code).toBe(ErrorCodes.PURCHASE_ALREADY_OWNED);
+      expect((await EntitlementModel.findById(entitlement._id))?.status).toBe('ACTIVE');
+    });
+
     it('allows concurrent pending purchases for different students on the same test series', async () => {
       const app = createApp();
       const studentToken = await login(app, 'student@example.com');
@@ -1108,6 +1225,27 @@ describe('Phase 7 purchases, entitlements, and Razorpay', () => {
       });
       expect(normalized?.status).toBe('EXPIRED');
       expect(normalized?.expiresAt).toBeInstanceOf(Date);
+    });
+
+    it('does not rewrite a consumed entitlement to EXPIRED when the original clock has passed', async () => {
+      const app = createApp();
+      const student = await userRepository.findByEmail('student@example.com');
+      const { pdf } = await seedCatalog(app);
+      const grantedAt = addDays(new Date(), -90);
+
+      const consumed = await EntitlementModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        purchaseId: new Types.ObjectId(),
+        status: 'CONSUMED',
+        grantedAt,
+        expiresAt: addDays(grantedAt, PAID_ENTITLEMENT_VALIDITY_DAYS),
+      });
+
+      const access = await studentHasTestSeriesAccess(student!._id.toString(), pdf.id);
+      expect(access.hasAccess).toBe(false);
+      expect(access.reason).toBe('ENTITLEMENT_REQUIRED');
+      expect((await EntitlementModel.findById(consumed._id))?.status).toBe('CONSUMED');
     });
 
     it('keeps historical entitlement after repurchase', async () => {

@@ -18,6 +18,7 @@ import type { PaginationInput } from '../../shared/http/pagination';
 import { toPaginationMeta } from '../../shared/http/pagination';
 import { accountDisabledError, AppError, ErrorCodes } from '../../shared/errors/app-error';
 import {
+  consumePaidEntitlementIfAttemptsExhausted,
   ensureFreeMcqEntitlement,
   studentHasTestSeriesAccess,
 } from '../entitlements/entitlement.service';
@@ -273,9 +274,11 @@ async function reconcileAttemptDeadline(
   }
 
   if (attempt.status === 'UPLOAD_PENDING' && isUploadWindowExpired(attempt, now)) {
-    return attemptRepository.updateById(attempt._id, {
+    const expired = await attemptRepository.updateById(attempt._id, {
       $set: { status: 'EXPIRED', ...examSessionClearFields() },
     });
+    await consumePaidEntitlementIfAttemptsExhausted(attempt.entitlementId.toString());
+    return expired;
   }
 
   if (attempt.status !== 'IN_PROGRESS' || !isPastExamEnd(attempt, now)) {
@@ -306,6 +309,7 @@ async function reconcileAttemptDeadline(
     }
 
     const finalized = await finalizeMcqOrEditorAttempt(fresh, now, session);
+    await consumePaidEntitlementIfAttemptsExhausted(fresh.entitlementId.toString(), session);
     return {
       attempt: finalized.attempt,
       submissionId: finalized.submissionId,
@@ -772,6 +776,7 @@ export async function submitAttempt(
   if (attempt.status === 'SUBMITTED') {
     const existing = await submissionRepository.findByAttemptId(attemptId);
     const submissionId = existing?._id.toString() ?? '';
+    await consumePaidEntitlementIfAttemptsExhausted(attempt.entitlementId.toString());
     await ensureSubmissionEvaluation(submissionId, studentId);
 
     return {
@@ -813,6 +818,7 @@ export async function submitAttempt(
 
     if (fresh.status === 'SUBMITTED') {
       const existing = await submissionRepository.findByAttemptId(attemptId, { session });
+      await consumePaidEntitlementIfAttemptsExhausted(fresh.entitlementId.toString(), session);
       return {
         attemptId: fresh._id.toString(),
         submissionId: existing?._id.toString() ?? '',
@@ -834,6 +840,7 @@ export async function submitAttempt(
     }
 
     const finalized = await finalizeMcqOrEditorAttempt(fresh, now, session);
+    await consumePaidEntitlementIfAttemptsExhausted(fresh.entitlementId.toString(), session);
 
     return {
       attemptId: fresh._id.toString(),
