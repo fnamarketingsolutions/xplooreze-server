@@ -39,7 +39,7 @@ describe('MongoDB connection infrastructure', () => {
     vi.mocked(mongoose.disconnect).mockReset();
     vi.mocked(mongoose.connect).mockResolvedValue(mongoose as never);
     vi.mocked(mongoose.disconnect).mockResolvedValue(undefined);
-    mongoose.connection.readyState = 0;
+    (mongoose.connection as { readyState: number }).readyState = 0;
   });
 
   afterEach(() => {
@@ -54,7 +54,7 @@ describe('MongoDB connection infrastructure', () => {
 
   it('connects with a provided URI and reports readiness', async () => {
     vi.mocked(mongoose.connect).mockImplementation(async () => {
-      mongoose.connection.readyState = 1;
+      (mongoose.connection as { readyState: number }).readyState = 1;
       return mongoose as never;
     });
 

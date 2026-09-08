@@ -129,7 +129,7 @@ describe('role authorization helpers', () => {
     app.get(
       '/student',
       (req, _res, next) => {
-        req.auth = { userId: 'u1', role: 'STUDENT', sessionId: 's1' };
+        req.auth = { userId: 'u1', role: 'STUDENT', status: 'ACTIVE', sessionId: 's1' };
         next();
       },
       requireStudent,
@@ -140,7 +140,7 @@ describe('role authorization helpers', () => {
     app.get(
       '/evaluator',
       (req, _res, next) => {
-        req.auth = { userId: 'u2', role: 'EVALUATOR', sessionId: 's2' };
+        req.auth = { userId: 'u2', role: 'EVALUATOR', status: 'ACTIVE', sessionId: 's2' };
         next();
       },
       requireEvaluator,
@@ -151,7 +151,7 @@ describe('role authorization helpers', () => {
     app.get(
       '/admin',
       (req, _res, next) => {
-        req.auth = { userId: 'u3', role: 'ADMIN', sessionId: 's3' };
+        req.auth = { userId: 'u3', role: 'ADMIN', status: 'ACTIVE', sessionId: 's3' };
         next();
       },
       requireAdmin,
@@ -162,7 +162,7 @@ describe('role authorization helpers', () => {
     app.get(
       '/admin-as-student',
       (req, _res, next) => {
-        req.auth = { userId: 'u1', role: 'STUDENT', sessionId: 's1' };
+        req.auth = { userId: 'u1', role: 'STUDENT', status: 'ACTIVE', sessionId: 's1' };
         next();
       },
       requireAdmin,

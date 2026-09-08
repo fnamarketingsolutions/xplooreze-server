@@ -13,6 +13,8 @@ describe('Blob configuration infrastructure', () => {
       readWriteToken: 'vercel_blob_rw_test',
       uploadUrlTtlSeconds: 120,
       downloadUrlTtlSeconds: 45,
+      cleanupEnabled: true,
+      cleanupIntervalMs: 60 * 60 * 1000,
     });
 
     expect(config).toEqual({

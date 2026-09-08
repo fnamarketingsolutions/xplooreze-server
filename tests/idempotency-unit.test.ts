@@ -17,7 +17,7 @@ function requestWithIdempotencyHeader(value: unknown) {
     headers: {
       'idempotency-key': value,
     },
-  } as Parameters<typeof readRequiredIdempotencyKey>[0];
+  } as unknown as Parameters<typeof readRequiredIdempotencyKey>[0];
 }
 
 function expectValidationError(run: () => void) {

@@ -1,6 +1,5 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,7 +17,7 @@ import { clearMemoryMongo, startMemoryMongo, stopMemoryMongo } from './helpers/m
 
 const PASSWORD = 'bootstrap-password-12';
 const OTHER_PASSWORD = 'other-bootstrap-99';
-const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+const ROOT = process.cwd();
 
 const bootstrapEnv = {
   ADMIN_BOOTSTRAP_EMAIL: 'admin@example.com',

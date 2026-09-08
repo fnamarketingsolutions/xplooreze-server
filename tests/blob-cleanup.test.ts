@@ -7,6 +7,7 @@ import { AttemptModel } from '../src/database/models/attempt.model';
 import { PENDING_FILE_ABANDONMENT_MS } from '../src/database/models/conventions';
 import { QuestionFileModel } from '../src/database/models/question-file.model';
 import { SubmissionFileModel } from '../src/database/models/submission-file.model';
+import { answerFileRepository } from '../src/database/repositories/files.repository';
 import { setBlobStoreForTests } from '../src/integrations/blob/blob.operations';
 import { runBlobCleanup } from '../src/modules/files/blob-cleanup.service';
 import { resetLoggerForTests } from '../src/shared/logger/logger';
@@ -303,7 +304,6 @@ describe('Blob cleanup', () => {
       { $set: { createdAt: hoursAgo(25, now) } },
     );
 
-    const { answerFileRepository } = await import('../src/database/repositories/files.repository');
     const pending = await answerFileRepository.findPendingCreatedBefore(
       new Date(now.getTime() - PENDING_FILE_ABANDONMENT_MS),
     );

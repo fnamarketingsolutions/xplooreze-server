@@ -150,6 +150,7 @@ describe('configuration', () => {
         jwtAudience: 'xplooreze-api',
         accessTokenTtl: '15m',
         refreshTokenTtl: '7d',
+        passwordResetTokenTtl: '30m',
         cookie: { name: 'refresh_token', path: '/auth', sameSite: 'lax', secure: false },
       });
       expect.unreachable('expected requireAuthConfig to throw');
@@ -205,6 +206,8 @@ describe('configuration', () => {
       requireBlobConfig({
         storeId: 'store_test',
         oidcToken: '',
+        cleanupEnabled: true,
+        cleanupIntervalMs: 60 * 60 * 1000,
       });
       expect.unreachable('expected requireBlobConfig to throw');
     } catch (error) {
@@ -245,6 +248,8 @@ describe('configuration', () => {
   it('accepts valid Blob configuration with a read-write token', () => {
     const config = requireBlobConfig({
       readWriteToken: 'vercel_blob_rw_test',
+      cleanupEnabled: true,
+      cleanupIntervalMs: 60 * 60 * 1000,
     });
 
     expect(config).toEqual({
