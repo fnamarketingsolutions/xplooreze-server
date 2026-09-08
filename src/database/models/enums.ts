@@ -71,4 +71,5 @@ export const COLLECTIONS = {
   authSessions: 'authSessions',
   passwordResetTokens: 'passwordResetTokens',
   httpIdempotencyKeys: 'httpIdempotencyKeys',
+  counters: 'counters',
 } as const;

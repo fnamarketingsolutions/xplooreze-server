@@ -12,6 +12,7 @@ import {
   listEntitlementsController,
 } from '../entitlements/entitlement.controller';
 import {
+  downloadStudentPurchaseReceiptController,
   getPurchaseCheckoutController,
   getPurchaseController,
   listPurchasesController,
@@ -29,6 +30,12 @@ meRouter.get(
   authenticate,
   requireStudent,
   getPurchaseCheckoutController,
+);
+meRouter.get(
+  '/purchases/:purchaseId/receipt',
+  authenticate,
+  requireStudent,
+  downloadStudentPurchaseReceiptController,
 );
 meRouter.get('/purchases/:purchaseId', authenticate, requireStudent, getPurchaseController);
 

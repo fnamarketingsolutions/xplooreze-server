@@ -21,6 +21,7 @@ import {
 } from '../entitlements/entitlement.service';
 import { toEntitlementDto } from '../entitlements/entitlement.dto';
 import { notifyPurchaseSuccessful } from '../notifications/notification.service';
+import { issuePurchaseReceipt } from '../purchases/purchase-receipt';
 import { toPurchaseDto } from '../purchases/purchase.dto';
 
 export type VerifyPaymentInput = {
@@ -130,7 +131,18 @@ async function grantAccessForPaidPurchase(
       session,
     });
 
-    return { purchase: updated, entitlement, newlyPaid: true };
+    const withReceipt = await issuePurchaseReceipt({
+      purchaseId,
+      studentId: purchase.studentId.toString(),
+      testSeriesId: purchase.testSeriesId.toString(),
+      issuedAt: grantedAt,
+      amount: purchase.amount,
+      currency: purchase.currency,
+      razorpayPaymentId,
+      session,
+    });
+
+    return { purchase: withReceipt, entitlement, newlyPaid: true };
   } catch {
     // Normalize a stale ACTIVE-but-expired entitlement, then retry once.
     await findValidActiveEntitlement(
@@ -148,7 +160,18 @@ async function grantAccessForPaidPurchase(
         grantedAt,
         session,
       });
-      return { purchase: updated, entitlement, newlyPaid: true };
+      const withReceipt = await issuePurchaseReceipt({
+        purchaseId,
+        studentId: purchase.studentId.toString(),
+        testSeriesId: purchase.testSeriesId.toString(),
+        issuedAt: grantedAt,
+        amount: purchase.amount,
+        currency: purchase.currency,
+        razorpayPaymentId,
+        session,
+      });
+
+      return { purchase: withReceipt, entitlement, newlyPaid: true };
     } catch (retryError) {
       const existingActive = await entitlementRepository.findActiveByStudentAndTestSeries(
         purchase.studentId.toString(),
@@ -157,7 +180,22 @@ async function grantAccessForPaidPurchase(
       );
 
       if (existingActive && isEntitlementUnexpired(existingActive)) {
-        return { purchase: updated, entitlement: existingActive, newlyPaid: true };
+        const issuedAt =
+          existingActive.purchaseId?.toString() === purchaseId
+            ? existingActive.grantedAt
+            : grantedAt;
+        const withReceipt = await issuePurchaseReceipt({
+          purchaseId,
+          studentId: purchase.studentId.toString(),
+          testSeriesId: purchase.testSeriesId.toString(),
+          issuedAt,
+          amount: purchase.amount,
+          currency: purchase.currency,
+          razorpayPaymentId,
+          session,
+        });
+
+        return { purchase: withReceipt, entitlement: existingActive, newlyPaid: true };
       }
 
       const mapped = mapPersistenceError(retryError);

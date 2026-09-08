@@ -11,8 +11,10 @@ import { runIdempotentOperation } from '../idempotency/idempotency.service';
 import {
   createPaidPurchase,
   getAdminPurchase,
+  getAdminPurchaseReceipt,
   getStudentPendingPurchaseCheckout,
   getStudentPurchase,
+  getStudentPurchaseReceipt,
   listAdminPurchases,
   listStudentPurchases,
 } from './purchase.service';
@@ -74,6 +76,29 @@ export async function getPurchaseController(req: Request, res: Response): Promis
   });
 }
 
+function sendReceiptPdf(
+  res: Response,
+  file: { filename: string; body: Buffer },
+): void {
+  res.status(200);
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `attachment; filename="${file.filename}"`);
+  res.setHeader('Content-Length', String(file.body.length));
+  res.send(file.body);
+}
+
+export async function downloadStudentPurchaseReceiptController(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const studentId = requireAuthUserId(req);
+  const file = await getStudentPurchaseReceipt(
+    studentId,
+    parsePurchaseId(req.params.purchaseId),
+  );
+  sendReceiptPdf(res, file);
+}
+
 export async function getPurchaseCheckoutController(req: Request, res: Response): Promise<void> {
   const studentId = requireAuthUserId(req);
   const checkout = await getStudentPendingPurchaseCheckout(
@@ -98,6 +123,14 @@ export async function listAdminPurchasesController(req: Request, res: Response):
     data: result.items,
     pagination: result.pagination,
   });
+}
+
+export async function downloadAdminPurchaseReceiptController(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const file = await getAdminPurchaseReceipt(parsePurchaseId(req.params.purchaseId));
+  sendReceiptPdf(res, file);
 }
 
 export async function getAdminPurchaseController(req: Request, res: Response): Promise<void> {

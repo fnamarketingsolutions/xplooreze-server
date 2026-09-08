@@ -2,6 +2,11 @@ import type { TestSeriesSummaryDto } from '../test-series/test-series-summary';
 
 export type PurchaseTestSeriesSummaryDto = TestSeriesSummaryDto;
 
+export type PurchaseReceiptDto = {
+  number: string;
+  issuedAt: string;
+};
+
 export type PurchaseDto = {
   id: string;
   studentId: string;
@@ -11,6 +16,7 @@ export type PurchaseDto = {
   status: string;
   razorpayOrderId: string | null;
   razorpayPaymentId: string | null;
+  receipt: PurchaseReceiptDto | null;
   createdAt: string;
   updatedAt: string;
   testSeries: PurchaseTestSeriesSummaryDto | null;
@@ -33,9 +39,23 @@ type PurchaseLike = {
   status: string;
   razorpayOrderId?: string | null;
   razorpayPaymentId?: string | null;
+  receipt?: { number?: string | null; issuedAt?: Date | null } | null;
   createdAt: Date;
   updatedAt: Date;
 };
+
+function toReceiptDto(
+  receipt: PurchaseLike['receipt'],
+): PurchaseReceiptDto | null {
+  if (!receipt?.number || !(receipt.issuedAt instanceof Date)) {
+    return null;
+  }
+
+  return {
+    number: receipt.number,
+    issuedAt: receipt.issuedAt.toISOString(),
+  };
+}
 
 export function toPurchaseDto(
   purchase: PurchaseLike,
@@ -50,6 +70,7 @@ export function toPurchaseDto(
     status: purchase.status,
     razorpayOrderId: purchase.razorpayOrderId ?? null,
     razorpayPaymentId: purchase.razorpayPaymentId ?? null,
+    receipt: toReceiptDto(purchase.receipt),
     createdAt: purchase.createdAt.toISOString(),
     updatedAt: purchase.updatedAt.toISOString(),
     testSeries,

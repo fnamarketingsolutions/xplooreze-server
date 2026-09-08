@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "seed:admin": "tsx src/scripts/seed-admin.ts",
     "backfill:attempt-entitlements": "tsx src/scripts/backfill-attempt-entitlements.ts",
+    "backfill:purchase-receipts": "tsx src/scripts/backfill-purchase-receipts.ts",
     "fix:purchase-razorpay-indexes": "tsx src/scripts/fix-purchase-razorpay-indexes.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
@@ -31,6 +32,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.9.2",
     "nodemailer": "^9.0.5",
+    "pdf-lib": "^1.17.1",
     "pino": "^10.3.1",
     "razorpay": "^2.9.8"
   },

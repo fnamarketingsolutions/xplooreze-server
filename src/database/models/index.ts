@@ -3,6 +3,7 @@ export { AuthSessionModel } from './auth-session.model';
 export { AttemptModel } from './attempt.model';
 export { AuditLogModel } from './audit-log.model';
 export { CategoryModel } from './category.model';
+export { CounterModel } from './counter.model';
 export { EntitlementModel } from './entitlement.model';
 export { EvaluationModel } from './evaluation.model';
 export { EvaluationRevisionModel } from './evaluation-revision.model';

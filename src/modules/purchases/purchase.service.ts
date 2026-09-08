@@ -11,6 +11,8 @@ import { resolveStudentOrTestSeriesSearch } from '../admin-list-search';
 import { findValidActiveEntitlement } from '../entitlements/entitlement.service';
 import { buildTestSeriesSummaryByIds } from '../test-series/test-series-summary';
 import { V1_CURRENCY } from '../test-series/test-series.validation';
+import { renderPurchaseReceiptPdf } from './purchase-receipt.pdf';
+import type { PurchaseReceiptSnapshot } from './purchase-receipt';
 import { toPurchaseDto } from './purchase.dto';
 import type { CreatePurchaseCheckoutDto, PurchaseDto } from './purchase.dto';
 import type { AdminPurchaseListQuery, CreatePurchaseInput } from './purchase.validation';
@@ -35,6 +37,14 @@ function notPurchasable(message: string): AppError {
   return new AppError({
     statusCode: 400,
     code: ErrorCodes.TEST_SERIES_NOT_PURCHASABLE,
+    message,
+  });
+}
+
+function receiptNotIssued(message: string): AppError {
+  return new AppError({
+    statusCode: 409,
+    code: ErrorCodes.RECEIPT_NOT_ISSUED,
     message,
   });
 }
@@ -344,6 +354,98 @@ export async function listAdminPurchases(
     items: await toEnrichedPurchaseDtos(items as PurchaseDocument[]),
     pagination: toPaginationMeta(pagination, total),
   };
+}
+
+type ReceiptPurchase = {
+  status: string;
+  receipt?: {
+    number?: string | null;
+    sequence?: number | null;
+    year?: number | null;
+    issuedAt?: Date | null;
+    studentName?: string | null;
+    studentEmail?: string | null;
+    testSeriesTitle?: string | null;
+    amount?: number | null;
+    currency?: string | null;
+    razorpayPaymentId?: string | null;
+    sellerName?: string | null;
+    sellerEmail?: string | null;
+    sellerPhone?: string | null;
+  } | null;
+};
+
+function toReceiptSnapshot(purchase: ReceiptPurchase): PurchaseReceiptSnapshot {
+  if (purchase.status !== 'PAID') {
+    throw receiptNotIssued('A receipt is issued only for a paid purchase.');
+  }
+
+  const receipt = purchase.receipt;
+  if (
+    !receipt?.number ||
+    typeof receipt.sequence !== 'number' ||
+    typeof receipt.year !== 'number' ||
+    !(receipt.issuedAt instanceof Date) ||
+    typeof receipt.amount !== 'number' ||
+    !receipt.currency ||
+    !receipt.sellerName ||
+    !receipt.sellerEmail ||
+    !receipt.sellerPhone
+  ) {
+    throw receiptNotIssued('Receipt has not been issued for this purchase.');
+  }
+
+  return {
+    number: receipt.number,
+    sequence: receipt.sequence,
+    year: receipt.year,
+    issuedAt: receipt.issuedAt,
+    studentName: receipt.studentName ?? '',
+    studentEmail: receipt.studentEmail ?? '',
+    testSeriesTitle: receipt.testSeriesTitle ?? '',
+    amount: receipt.amount,
+    currency: receipt.currency,
+    razorpayPaymentId: receipt.razorpayPaymentId ?? '',
+    sellerName: receipt.sellerName,
+    sellerEmail: receipt.sellerEmail,
+    sellerPhone: receipt.sellerPhone,
+  };
+}
+
+export type PurchaseReceiptFile = {
+  filename: string;
+  body: Buffer;
+};
+
+async function renderReceiptFile(purchase: ReceiptPurchase): Promise<PurchaseReceiptFile> {
+  const snapshot = toReceiptSnapshot(purchase);
+  return {
+    filename: `${snapshot.number}.pdf`,
+    body: await renderPurchaseReceiptPdf(snapshot),
+  };
+}
+
+export async function getStudentPurchaseReceipt(
+  studentId: string,
+  purchaseId: string,
+): Promise<PurchaseReceiptFile> {
+  const purchase = await purchaseRepository.findById(purchaseId);
+
+  if (!purchase || purchase.studentId.toString() !== studentId) {
+    throw purchaseNotFound();
+  }
+
+  return renderReceiptFile(purchase);
+}
+
+export async function getAdminPurchaseReceipt(purchaseId: string): Promise<PurchaseReceiptFile> {
+  const purchase = await purchaseRepository.findById(purchaseId);
+
+  if (!purchase) {
+    throw purchaseNotFound();
+  }
+
+  return renderReceiptFile(purchase);
 }
 
 export async function getAdminPurchase(purchaseId: string) {

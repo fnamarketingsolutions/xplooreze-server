@@ -26,6 +26,7 @@ import {
   studentHasTestSeriesAccess,
 } from '../src/modules/entitlements/entitlement.service';
 import { PAID_ENTITLEMENT_VALIDITY_DAYS, PENDING_PURCHASE_REUSE_WINDOW_MS } from '../src/database/models/conventions';
+import { backfillPurchaseReceipts } from '../src/modules/purchases/purchase-receipt';
 import { ErrorCodes } from '../src/shared/errors/app-error';
 import { resetLoggerForTests } from '../src/shared/logger/logger';
 import { clearMemoryMongo, startMemoryMongo, stopMemoryMongo } from './helpers/mongo-memory';
@@ -741,6 +742,111 @@ describe('Phase 7 purchases, entitlements, and Razorpay', () => {
 
       const access = await studentHasTestSeriesAccess(student!._id.toString(), pdf.id);
       expect(access.hasAccess).toBe(true);
+
+      const receipt = verified.body.data.purchase.receipt as { number: string; issuedAt: string };
+      expect(receipt.number).toMatch(/^XP-\d{4}-\d{6}$/);
+      expect(receipt.issuedAt).toBe(verified.body.data.entitlement.grantedAt);
+
+      const again = await request(app).post('/payments/verify').set(bearer(studentToken)).send({
+        purchaseId: checkout.purchaseId,
+        razorpayOrderId: checkout.razorpayOrderId,
+        razorpayPaymentId: paymentId,
+        razorpaySignature: signature,
+      });
+      expect(again.status).toBe(200);
+      expect(again.body.data.purchase.receipt.number).toBe(receipt.number);
+
+      const downloaded = await request(app)
+        .get(`/me/purchases/${checkout.purchaseId}/receipt`)
+        .set(bearer(studentToken));
+      expect(downloaded.status).toBe(200);
+      expect(downloaded.headers['content-type']).toContain('application/pdf');
+      expect(downloaded.headers['content-disposition']).toContain(`${receipt.number}.pdf`);
+      expect(downloaded.body.subarray(0, 5).toString()).toBe('%PDF-');
+    });
+
+    it('backfills receipts for paid purchases in entitlement grantedAt order', async () => {
+      const app = createApp();
+      const adminToken = await login(app, 'admin@example.com');
+      const student = await userRepository.findByEmail('student@example.com');
+      const { pdf } = await seedCatalog(app);
+      const olderGrantedAt = new Date('2025-06-01T04:30:00.000Z');
+      const newerGrantedAt = new Date('2026-02-01T04:30:00.000Z');
+
+      const older = await PurchaseModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        amount: PRICE_PAISE,
+        currency: 'INR',
+        status: 'PAID',
+        razorpayOrderId: 'order_receipt_old',
+        razorpayPaymentId: 'pay_receipt_old',
+      });
+      const newer = await PurchaseModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        amount: PRICE_PAISE,
+        currency: 'INR',
+        status: 'PAID',
+        razorpayOrderId: 'order_receipt_new',
+        razorpayPaymentId: 'pay_receipt_new',
+      });
+      const missingEntitlement = await PurchaseModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        amount: PRICE_PAISE,
+        currency: 'INR',
+        status: 'PAID',
+        razorpayOrderId: 'order_receipt_none',
+        razorpayPaymentId: 'pay_receipt_none',
+      });
+
+      await EntitlementModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        purchaseId: newer._id,
+        status: 'EXPIRED',
+        grantedAt: newerGrantedAt,
+        expiresAt: addDays(newerGrantedAt, PAID_ENTITLEMENT_VALIDITY_DAYS),
+      });
+      await EntitlementModel.create({
+        studentId: student!._id,
+        testSeriesId: pdf.id,
+        purchaseId: older._id,
+        status: 'EXPIRED',
+        grantedAt: olderGrantedAt,
+        expiresAt: addDays(olderGrantedAt, PAID_ENTITLEMENT_VALIDITY_DAYS),
+      });
+
+      const result = await backfillPurchaseReceipts();
+      expect(result.issued).toBe(2);
+      expect(result.skippedNoEntitlement).toEqual([missingEntitlement._id.toString()]);
+      expect(result.skippedNoSeriesTitle).toEqual([]);
+
+      const olderPaid = await PurchaseModel.findById(older._id);
+      const newerPaid = await PurchaseModel.findById(newer._id);
+      expect(olderPaid?.receipt?.number).toBe('XP-2025-000001');
+      expect(olderPaid?.receipt?.issuedAt?.toISOString()).toBe(olderGrantedAt.toISOString());
+      expect(olderPaid?.receipt?.studentName).toBe('Stu Dent');
+      expect(olderPaid?.receipt?.testSeriesTitle).toBe('PDF Series');
+      expect(newerPaid?.receipt?.number).toBe('XP-2026-000001');
+
+      const pending = await request(app)
+        .get(`/me/purchases/${missingEntitlement._id.toString()}/receipt`)
+        .set(bearer(await login(app, 'student@example.com')));
+      expect(pending.status).toBe(409);
+      expect(pending.body.error.code).toBe(ErrorCodes.RECEIPT_NOT_ISSUED);
+
+      const other = await request(app)
+        .get(`/me/purchases/${older._id.toString()}/receipt`)
+        .set(bearer(await login(app, 'student2@example.com')));
+      expect(other.status).toBe(404);
+
+      const adminDownload = await request(app)
+        .get(`/admin/purchases/${older._id.toString()}/receipt`)
+        .set(bearer(adminToken));
+      expect(adminDownload.status).toBe(200);
+      expect(adminDownload.headers['content-disposition']).toContain('XP-2025-000001.pdf');
     });
 
     it('rejects invalid signatures, unknown orders, and wrong linkage', async () => {
