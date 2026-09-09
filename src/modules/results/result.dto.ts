@@ -85,6 +85,7 @@ export type ResultUserSummary = {
   id: string;
   name: string;
   email: string;
+  mobileNumber: string | null;
 };
 
 export type ResultCatalogSummary = {
@@ -145,6 +146,7 @@ type UserLike = {
   _id: { toString(): string };
   name: { first: string; last: string };
   email: string;
+  mobileNumber?: string | null;
 };
 
 type TestSeriesLike = {
@@ -190,6 +192,7 @@ export function toResultUserSummary(user: UserLike): ResultUserSummary {
     id: user._id.toString(),
     name: `${user.name.first} ${user.name.last}`.trim(),
     email: user.email,
+    mobileNumber: user.mobileNumber ?? null,
   };
 }
 

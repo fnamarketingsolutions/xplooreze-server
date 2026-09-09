@@ -3,6 +3,7 @@ import type { UserRole, UserStatus } from '../../database/models/enums';
 export type AssignmentEvaluatorDto = {
   id: string;
   email: string;
+  mobileNumber: string | null;
   role: UserRole;
   status: UserStatus;
   name: {
@@ -54,6 +55,7 @@ type AssignmentLike = {
 type EvaluatorLike = {
   _id: { toString(): string };
   email: string;
+  mobileNumber?: string | null;
   role: UserRole;
   status: UserStatus;
   name: {
@@ -71,6 +73,7 @@ function toAssignmentEvaluatorDto(evaluator: EvaluatorLike): AssignmentEvaluator
   return {
     id: evaluator._id.toString(),
     email: evaluator.email,
+    mobileNumber: evaluator.mobileNumber ?? null,
     role: evaluator.role,
     status: evaluator.status,
     name: {

@@ -378,6 +378,7 @@ type ReceiptPurchase = {
     issuedAt?: Date | null;
     studentName?: string | null;
     studentEmail?: string | null;
+    studentMobileNumber?: string | null;
     testSeriesTitle?: string | null;
     amount?: number | null;
     currency?: string | null;
@@ -415,6 +416,7 @@ function toReceiptSnapshot(purchase: ReceiptPurchase): PurchaseReceiptSnapshot {
     issuedAt: receipt.issuedAt,
     studentName: receipt.studentName ?? '',
     studentEmail: receipt.studentEmail ?? '',
+    studentMobileNumber: receipt.studentMobileNumber ?? '',
     testSeriesTitle: receipt.testSeriesTitle ?? '',
     amount: receipt.amount,
     currency: receipt.currency,

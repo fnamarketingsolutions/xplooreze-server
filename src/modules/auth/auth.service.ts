@@ -1,5 +1,6 @@
 import type { ClientSession } from 'mongoose';
 
+import { remapDuplicateKey } from '../../database/errors';
 import { getConfig, parseTtlToMs, requireAuthConfig } from '../../config/index';
 import {
   auditLogRepository,
@@ -17,7 +18,9 @@ import type {
   LoginInput,
   RegisterInput,
   ResetPasswordInput,
+  UpdateOwnMobileNumberInput,
 } from './auth.validation';
+import { isMobileNumberDuplicate, mobileAlreadyRegistered } from './mobile-number';
 import { hashPassword, verifyPassword } from './password';
 import {
   createPasswordResetToken,
@@ -149,27 +152,51 @@ async function issueSession(user: {
   };
 }
 
+function emailAlreadyRegistered(): AppError {
+  return new AppError({
+    statusCode: 409,
+    code: ErrorCodes.EMAIL_ALREADY_REGISTERED,
+    message: 'An account with this email already exists.',
+  });
+}
+
+function remapUserUniqueConflict(error: unknown): never {
+  if (isMobileNumberDuplicate(error)) {
+    remapDuplicateKey(error, mobileAlreadyRegistered());
+  }
+
+  remapDuplicateKey(error, emailAlreadyRegistered());
+}
+
 export async function register(input: RegisterInput): Promise<AuthResult> {
   const existing = await userRepository.findByEmail(input.email);
 
   if (existing) {
-    throw new AppError({
-      statusCode: 409,
-      code: ErrorCodes.EMAIL_ALREADY_REGISTERED,
-      message: 'An account with this email already exists.',
-    });
+    throw emailAlreadyRegistered();
+  }
+
+  const existingMobile = await userRepository.findByMobileNumber(input.mobileNumber);
+
+  if (existingMobile) {
+    throw mobileAlreadyRegistered();
   }
 
   const passwordHash = await hashPassword(input.password);
-  const user = await userRepository.create({
-    email: input.email,
-    passwordHash,
-    role: 'STUDENT',
-    status: 'ACTIVE',
-    name: input.name,
-  });
 
-  return issueSession(user);
+  try {
+    const user = await userRepository.create({
+      email: input.email,
+      passwordHash,
+      role: 'STUDENT',
+      status: 'ACTIVE',
+      name: input.name,
+      mobileNumber: input.mobileNumber,
+    });
+
+    return issueSession(user);
+  } catch (error) {
+    remapUserUniqueConflict(error);
+  }
 }
 
 export async function login(input: LoginInput): Promise<AuthResult> {
@@ -375,6 +402,57 @@ export async function resetPassword(input: ResetPasswordInput): Promise<void> {
       { session },
     );
   });
+}
+
+export async function updateOwnMobileNumber(
+  userId: string,
+  input: UpdateOwnMobileNumberInput,
+): Promise<SafeUser> {
+  const user = await userRepository.findById(userId);
+
+  if (!user || user.deletedAt != null) {
+    throw new AppError({
+      statusCode: 401,
+      code: ErrorCodes.AUTHENTICATION_REQUIRED,
+      message: 'Authentication required.',
+    });
+  }
+
+  if (user.status !== 'ACTIVE') {
+    throw new AppError({
+      statusCode: 403,
+      code: ErrorCodes.ACCOUNT_DISABLED,
+      message: 'Account is disabled.',
+    });
+  }
+
+  if (user.mobileNumber === input.mobileNumber) {
+    return toSafeUser(user);
+  }
+
+  const existingMobile = await userRepository.findByMobileNumber(input.mobileNumber);
+
+  if (existingMobile && existingMobile._id.toString() !== userId) {
+    throw mobileAlreadyRegistered();
+  }
+
+  try {
+    const updated = await userRepository.updateById(userId, {
+      $set: { mobileNumber: input.mobileNumber },
+    });
+
+    if (!updated || updated.deletedAt != null) {
+      throw new AppError({
+        statusCode: 401,
+        code: ErrorCodes.AUTHENTICATION_REQUIRED,
+        message: 'Authentication required.',
+      });
+    }
+
+    return toSafeUser(updated);
+  } catch (error) {
+    remapUserUniqueConflict(error);
+  }
 }
 
 export async function getAuthenticatedUser(userId: string): Promise<SafeUser> {

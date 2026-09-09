@@ -42,6 +42,7 @@ export type EvaluationSubmissionFileDto = {
 export type EvaluationStudentSummaryDto = {
   id: string;
   email: string;
+  mobileNumber: string | null;
   name: {
     first: string;
     last: string;

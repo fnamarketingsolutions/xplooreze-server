@@ -24,12 +24,14 @@ describe('Phase 12 unit rules', () => {
       email: 'Eva.Luator@Example.com ',
       password: 'password12',
       role: 'EVALUATOR',
+      mobileNumber: '+919876543210',
       name: { first: 'Eva', last: 'Luator' },
     });
     expect(evaluator).toEqual({
       email: 'eva.luator@example.com',
       password: 'password12',
       role: 'EVALUATOR',
+      mobileNumber: '+919876543210',
       name: { first: 'Eva', last: 'Luator' },
     });
 
@@ -38,6 +40,7 @@ describe('Phase 12 unit rules', () => {
         email: 'admin@example.com',
         password: 'password12',
         role: 'ADMIN',
+        mobileNumber: '+919876543211',
         name: { first: 'Ada', last: 'Min' },
       }).role,
     ).toBe('ADMIN');
@@ -47,6 +50,7 @@ describe('Phase 12 unit rules', () => {
         email: 'student@example.com',
         password: 'password12',
         role: 'STUDENT',
+        mobileNumber: '+919876543212',
         name: { first: 'Stu', last: 'Dent' },
       });
       throw new Error('expected student role to fail');
@@ -59,6 +63,7 @@ describe('Phase 12 unit rules', () => {
         email: 'x@example.com',
         password: 'password12',
         role: 'SUPER_ADMIN',
+        mobileNumber: '+919876543213',
         name: { first: 'X', last: 'Y' },
       });
       throw new Error('expected super admin role to fail');
@@ -67,10 +72,13 @@ describe('Phase 12 unit rules', () => {
     }
   });
 
-  it('limits user PATCH to role and status and rejects other fields', () => {
+  it('limits user PATCH to role, status, and mobileNumber and rejects other fields', () => {
     expect(parseUpdateAdminUserInput({ role: 'STUDENT', status: 'DISABLED' })).toEqual({
       role: 'STUDENT',
       status: 'DISABLED',
+    });
+    expect(parseUpdateAdminUserInput({ mobileNumber: '+919876543210' })).toEqual({
+      mobileNumber: '+919876543210',
     });
 
     for (const body of [
@@ -102,6 +110,7 @@ describe('Phase 12 unit rules', () => {
     expect(dto).toEqual({
       id: evaluatorId,
       email: 'admin@example.com',
+      mobileNumber: null,
       role: 'ADMIN',
       status: 'ACTIVE',
       name: { first: 'Ada', last: 'Min' },
@@ -171,6 +180,7 @@ describe('Phase 12 unit rules', () => {
     expect(dto.evaluator).toEqual({
       id: evaluatorId,
       email: 'evaluator@example.com',
+      mobileNumber: null,
       role: 'EVALUATOR',
       status: 'ACTIVE',
       name: { first: 'Eva', last: 'Luator' },

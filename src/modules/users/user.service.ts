@@ -12,6 +12,7 @@ import type { PaginationInput } from '../../shared/http/pagination';
 import { toPaginationMeta } from '../../shared/http/pagination';
 import { AppError, ErrorCodes } from '../../shared/errors/app-error';
 import { hashPassword } from '../auth/password';
+import { isMobileNumberDuplicate, mobileAlreadyRegistered } from '../auth/mobile-number';
 import { toAdminUserDto } from './user.dto';
 import type {
   AdminUserListQuery,
@@ -99,11 +100,25 @@ export async function getAdminUser(userId: string) {
   return toAdminUserDto(user);
 }
 
+function remapUserUniqueConflict(error: unknown): never {
+  if (isMobileNumberDuplicate(error)) {
+    remapDuplicateKey(error, mobileAlreadyRegistered());
+  }
+
+  remapDuplicateKey(error, emailAlreadyRegistered());
+}
+
 export async function createAdminUser(actor: AdminActor, input: CreateAdminUserInput) {
   const existing = await userRepository.findByEmail(input.email);
 
   if (existing) {
     throw emailAlreadyRegistered();
+  }
+
+  const existingMobile = await userRepository.findByMobileNumber(input.mobileNumber);
+
+  if (existingMobile) {
+    throw mobileAlreadyRegistered();
   }
 
   const passwordHash = await hashPassword(input.password);
@@ -117,6 +132,7 @@ export async function createAdminUser(actor: AdminActor, input: CreateAdminUserI
           role: input.role,
           status: 'ACTIVE',
           name: input.name,
+          mobileNumber: input.mobileNumber,
         },
         { session },
       );
@@ -132,7 +148,7 @@ export async function createAdminUser(actor: AdminActor, input: CreateAdminUserI
       return toAdminUserDto(created);
     });
   } catch (error) {
-    remapDuplicateKey(error, emailAlreadyRegistered());
+    remapUserUniqueConflict(error);
   }
 }
 
@@ -142,7 +158,11 @@ export async function updateAdminUser(
   input: UpdateAdminUserInput,
 ) {
   const user = await requireUser(userId);
-  const updates: { role?: typeof user.role; status?: typeof user.status } = {};
+  const updates: {
+    role?: typeof user.role;
+    status?: typeof user.status;
+    mobileNumber?: string;
+  } = {};
 
   if (input.role !== undefined && input.role !== user.role) {
     updates.role = input.role;
@@ -152,51 +172,79 @@ export async function updateAdminUser(
     updates.status = input.status;
   }
 
+  if (input.mobileNumber !== undefined && input.mobileNumber !== user.mobileNumber) {
+    const existingMobile = await userRepository.findByMobileNumber(input.mobileNumber);
+
+    if (existingMobile && existingMobile._id.toString() !== userId) {
+      throw mobileAlreadyRegistered();
+    }
+
+    updates.mobileNumber = input.mobileNumber;
+  }
+
   if (Object.keys(updates).length === 0) {
     return toAdminUserDto(user);
   }
 
-  const updated = await withTransaction(async (session) => {
-    const next = await userRepository.updateById(userId, { $set: updates }, { session });
+  const shouldRevokeSessions = updates.role !== undefined || updates.status !== undefined;
 
-    if (!next || next.deletedAt != null) {
-      throw userNotFound();
-    }
+  try {
+    const updated = await withTransaction(async (session) => {
+      const next = await userRepository.updateById(userId, { $set: updates }, { session });
 
-    await authSessionRepository.revokeAllForUser(userId, new Date(), { session });
+      if (!next || next.deletedAt != null) {
+        throw userNotFound();
+      }
 
-    if (updates.role) {
-      await writeAudit(
-        actor,
-        'ROLE_CHANGED',
-        userId,
-        { previousRole: user.role, role: updates.role },
-        session,
-      );
-    }
+      if (shouldRevokeSessions) {
+        await authSessionRepository.revokeAllForUser(userId, new Date(), { session });
+      }
 
-    if (updates.status === 'DISABLED') {
-      await writeAudit(
-        actor,
-        'USER_DISABLED',
-        userId,
-        { previousStatus: user.status, status: updates.status },
-        session,
-      );
-    }
+      if (updates.role) {
+        await writeAudit(
+          actor,
+          'ROLE_CHANGED',
+          userId,
+          { previousRole: user.role, role: updates.role },
+          session,
+        );
+      }
 
-    if (updates.status === 'ACTIVE') {
-      await writeAudit(
-        actor,
-        'USER_ENABLED',
-        userId,
-        { previousStatus: user.status, status: updates.status },
-        session,
-      );
-    }
+      if (updates.status === 'DISABLED') {
+        await writeAudit(
+          actor,
+          'USER_DISABLED',
+          userId,
+          { previousStatus: user.status, status: updates.status },
+          session,
+        );
+      }
 
-    return next;
-  });
+      if (updates.status === 'ACTIVE') {
+        await writeAudit(
+          actor,
+          'USER_ENABLED',
+          userId,
+          { previousStatus: user.status, status: updates.status },
+          session,
+        );
+      }
 
-  return toAdminUserDto(updated);
+      if (updates.mobileNumber) {
+        await writeAudit(
+          actor,
+          'USER_MOBILE_NUMBER_CHANGED',
+          userId,
+          { previousMobileNumber: user.mobileNumber ?? null, mobileNumber: updates.mobileNumber },
+          session,
+        );
+      }
+
+      return next;
+    });
+
+    return toAdminUserDto(updated);
+  } catch (error) {
+    remapUserUniqueConflict(error);
+  }
 }

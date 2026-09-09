@@ -426,6 +426,7 @@ function buildEvaluationStudentSummary(
   return {
     id: student._id.toString(),
     email: student.email,
+    mobileNumber: student.mobileNumber ?? null,
     name: {
       first: student.name.first,
       last: student.name.last,

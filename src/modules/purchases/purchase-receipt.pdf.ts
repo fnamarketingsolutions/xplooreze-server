@@ -219,6 +219,14 @@ export async function renderPurchaseReceiptPdf(receipt: PurchaseReceiptSnapshot)
     font: regular,
     color: MUTED,
   });
+  y -= 14;
+  page.drawText(displayOrDash(receipt.studentMobileNumber), {
+    x: MARGIN,
+    y,
+    size: 10,
+    font: regular,
+    color: MUTED,
+  });
 
   y -= 28;
 

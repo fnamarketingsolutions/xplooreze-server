@@ -20,6 +20,7 @@ export type PurchaseReceiptSnapshot = {
   issuedAt: Date;
   studentName: string;
   studentEmail: string;
+  studentMobileNumber: string;
   testSeriesTitle: string;
   amount: number;
   currency: string;
@@ -119,6 +120,7 @@ export async function issuePurchaseReceipt(input: {
     issuedAt: input.issuedAt,
     studentName: formatStudentName(student?.name),
     studentEmail: student?.email ?? '',
+    studentMobileNumber: student?.mobileNumber?.trim() ?? '',
     testSeriesTitle: testSeries?.title?.trim() ?? '',
     amount: input.amount,
     currency: input.currency,

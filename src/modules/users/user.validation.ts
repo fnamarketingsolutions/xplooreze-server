@@ -10,11 +10,11 @@ import {
   requireAtLeastOneField,
   validationError,
 } from '../../shared/validation/http';
-import { NAME_MAX_LENGTH, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../auth/auth.validation';
+import { NAME_MAX_LENGTH, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, validateMobileNumber } from '../auth/auth.validation';
 import { isValidEmail, normalizeEmail } from '../auth/email';
 
-const CREATE_FIELDS = ['name', 'email', 'password', 'role'] as const;
-const UPDATE_FIELDS = ['role', 'status'] as const;
+const CREATE_FIELDS = ['name', 'email', 'password', 'role', 'mobileNumber'] as const;
+const UPDATE_FIELDS = ['role', 'status', 'mobileNumber'] as const;
 
 export type PrivilegedRole = 'ADMIN' | 'EVALUATOR';
 
@@ -22,6 +22,7 @@ export type CreateAdminUserInput = {
   email: string;
   password: string;
   role: PrivilegedRole;
+  mobileNumber: string;
   name: {
     first: string;
     last: string;
@@ -31,6 +32,7 @@ export type CreateAdminUserInput = {
 export type UpdateAdminUserInput = {
   role?: UserRole;
   status?: UserStatus;
+  mobileNumber?: string;
 };
 
 export type AdminUserListQuery = {
@@ -106,6 +108,7 @@ export function parseCreateAdminUserInput(body: unknown): CreateAdminUserInput {
     email,
     password,
     role: readPrivilegedRole(record.role, 'role'),
+    mobileNumber: validateMobileNumber(record.mobileNumber),
     name: {
       first: validateNamePart(name.first, 'name.first'),
       last: validateNamePart(name.last, 'name.last'),
@@ -121,6 +124,9 @@ export function parseUpdateAdminUserInput(body: unknown): UpdateAdminUserInput {
   return {
     ...(record.role !== undefined ? { role: readUserRole(record.role, 'role') } : {}),
     ...(record.status !== undefined ? { status: readUserStatus(record.status, 'status') } : {}),
+    ...(record.mobileNumber !== undefined
+      ? { mobileNumber: validateMobileNumber(record.mobileNumber) }
+      : {}),
   };
 }
 

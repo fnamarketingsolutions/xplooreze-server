@@ -27,6 +27,12 @@ import { clearMemoryMongo, startMemoryMongo, stopMemoryMongo } from './helpers/m
 const TEST_SECRET = 'test-jwt-secret-at-least-32-characters-long';
 const PASSWORD = 'password12';
 const PRICE_PAISE = 49900;
+let mobileSequence = 9876500000;
+
+function nextMobileNumber(): string {
+  mobileSequence += 1;
+  return `+91${mobileSequence}`;
+}
 
 type App = ReturnType<typeof createApp>;
 
@@ -127,7 +133,12 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
   async function createPrivilegedUser(
     app: App,
     adminToken: string,
-    body: { email: string; role: 'ADMIN' | 'EVALUATOR'; name?: { first: string; last: string } },
+    body: {
+      email: string;
+      role: 'ADMIN' | 'EVALUATOR';
+      name?: { first: string; last: string };
+      mobileNumber?: string;
+    },
   ) {
     const response = await request(app)
       .post('/admin/users')
@@ -136,6 +147,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
         email: body.email,
         password: PASSWORD,
         role: body.role,
+        mobileNumber: body.mobileNumber ?? nextMobileNumber(),
         name: body.name ?? { first: 'Priv', last: 'User' },
       });
     expect(response.status).toBe(201);
@@ -151,6 +163,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
         .send({
           email: 'student@example.com',
           password: PASSWORD,
+          mobileNumber: nextMobileNumber(),
           name: { first: 'Stu', last: 'Dent' },
         });
 
@@ -204,6 +217,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
         .send({
           email: 'student@example.com',
           password: PASSWORD,
+          mobileNumber: nextMobileNumber(),
           name: { first: 'Stu', last: 'Dent' },
         });
       await createPrivilegedUser(app, adminToken, {
@@ -316,6 +330,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
           email: 'not-allowed@example.com',
           password: PASSWORD,
           role: 'STUDENT',
+          mobileNumber: nextMobileNumber(),
           name: { first: 'No', last: 'Pe' },
         });
       expect(studentRole.status).toBe(400);
@@ -328,6 +343,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
           email: 'super@example.com',
           password: PASSWORD,
           role: 'SUPER_ADMIN',
+          mobileNumber: nextMobileNumber(),
           name: { first: 'Super', last: 'Admin' },
         });
       expect(unknownRole.status).toBe(400);
@@ -339,6 +355,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
           email: 'evaluator@example.com',
           password: PASSWORD,
           role: 'EVALUATOR',
+          mobileNumber: nextMobileNumber(),
           name: { first: 'Eva', last: 'Luator' },
         });
       expect(duplicate.status).toBe(409);
@@ -405,6 +422,58 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
       assertNoAuthSecrets(await AuditLogModel.find({}).lean(), PASSWORD);
     });
 
+    it('sets mobile number without revoking sessions', async () => {
+      const app = createApp();
+      const adminToken = await login(app, 'admin@example.com');
+      const created = await createPrivilegedUser(app, adminToken, {
+        email: 'evaluator@example.com',
+        role: 'EVALUATOR',
+        mobileNumber: '+919876543210',
+      });
+      const evaluatorId = created.body.data.id as string;
+      const evaluatorToken = await login(app, 'evaluator@example.com');
+      const before = await AuthSessionModel.countDocuments({
+        userId: evaluatorId,
+        revokedAt: null,
+      });
+      expect(before).toBeGreaterThan(0);
+
+      const updated = await request(app)
+        .patch(`/admin/users/${evaluatorId}`)
+        .set(bearer(adminToken))
+        .send({ mobileNumber: '+919876543211' });
+      expect(updated.status).toBe(200);
+      expect(updated.body.data.mobileNumber).toBe('+919876543211');
+
+      const after = await AuthSessionModel.countDocuments({
+        userId: evaluatorId,
+        revokedAt: null,
+      });
+      expect(after).toBe(before);
+
+      const me = await request(app).get('/auth/me').set(bearer(evaluatorToken));
+      expect(me.status).toBe(200);
+
+      const taken = await createPrivilegedUser(app, adminToken, {
+        email: 'other-evaluator@example.com',
+        role: 'EVALUATOR',
+        mobileNumber: '+919811111111',
+      });
+      const conflict = await request(app)
+        .patch(`/admin/users/${evaluatorId}`)
+        .set(bearer(adminToken))
+        .send({ mobileNumber: '+919811111111' });
+      expect(conflict.status).toBe(409);
+      expect(conflict.body.error.code).toBe(ErrorCodes.MOBILE_NUMBER_ALREADY_REGISTERED);
+      expect(taken.body.data.mobileNumber).toBe('+919811111111');
+
+      const audits = await AuditLogModel.find({
+        action: 'USER_MOBILE_NUMBER_CHANGED',
+        'resource.id': evaluatorId,
+      }).lean();
+      expect(audits.length).toBeGreaterThan(0);
+    });
+
     it('blocks students, evaluators, and unauthenticated callers', async () => {
       const app = createApp();
       const adminToken = await login(app, 'admin@example.com');
@@ -417,6 +486,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
         .send({
           email: 'student@example.com',
           password: PASSWORD,
+          mobileNumber: nextMobileNumber(),
           name: { first: 'Stu', last: 'Dent' },
         });
       const studentToken = await login(app, 'student@example.com');
@@ -460,6 +530,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
         .send({
           email: 'student@example.com',
           password: PASSWORD,
+          mobileNumber: nextMobileNumber(),
           name: { first: 'Stu', last: 'Dent' },
         });
       const studentId = registered.body.data.user.id as string;
@@ -868,6 +939,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
         .send({
           email: 'student@example.com',
           password: PASSWORD,
+          mobileNumber: nextMobileNumber(),
           name: { first: 'Stu', last: 'Dent' },
         });
       const studentId = await userIdFor('student@example.com');
@@ -989,6 +1061,7 @@ describe('Phase 12 Admin Identity & Evaluator Administration', () => {
           .send({
             email,
             password: PASSWORD,
+            mobileNumber: nextMobileNumber(),
             name: { first: 'Stu', last: 'Dent' },
           });
         expect(registered.status).toBe(201);

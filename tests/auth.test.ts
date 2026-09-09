@@ -23,6 +23,7 @@ const PASSWORD = 'password12';
 const registerBody = {
   email: 'student@example.com',
   password: PASSWORD,
+  mobileNumber: '+919876543210',
   name: { first: 'Ada', last: 'Lovelace' },
 };
 
@@ -75,6 +76,7 @@ describe('authentication API', () => {
     expect(response.body.success).toBe(true);
     expect(response.body.data.user).toMatchObject({
       email: 'john.doe@example.com',
+      mobileNumber: '+919876543210',
       role: 'STUDENT',
       status: 'ACTIVE',
       name: { first: 'Ada', last: 'Lovelace' },
@@ -112,10 +114,36 @@ describe('authentication API', () => {
     expect(invalidPassword.status).toBe(400);
     expect(invalidPassword.body.error.code).toBe(ErrorCodes.VALIDATION_ERROR);
 
+    const invalidMobile = await request(app)
+      .post('/auth/register')
+      .send({ ...registerBody, mobileNumber: '9876543210' });
+    expect(invalidMobile.status).toBe(400);
+    expect(invalidMobile.body.error.code).toBe(ErrorCodes.VALIDATION_ERROR);
+
+    const international = await request(app)
+      .post('/auth/register')
+      .send({
+        ...registerBody,
+        email: 'intl@example.com',
+        mobileNumber: '+1 202-555-0123',
+      });
+    expect(international.status).toBe(201);
+    expect(international.body.data.user.mobileNumber).toBe('+12025550123');
+
     await request(app).post('/auth/register').send(registerBody);
     const duplicate = await request(app).post('/auth/register').send(registerBody);
     expect(duplicate.status).toBe(409);
     expect(duplicate.body.error.code).toBe(ErrorCodes.EMAIL_ALREADY_REGISTERED);
+
+    const duplicateMobile = await request(app)
+      .post('/auth/register')
+      .send({
+        ...registerBody,
+        email: 'other@example.com',
+        mobileNumber: '+919876543210',
+      });
+    expect(duplicateMobile.status).toBe(409);
+    expect(duplicateMobile.body.error.code).toBe(ErrorCodes.MOBILE_NUMBER_ALREADY_REGISTERED);
   });
 
   it('logs in with valid credentials and issues an access token plus refresh cookie', async () => {
@@ -231,6 +259,70 @@ describe('authentication API', () => {
       .set('Authorization', `Bearer ${invalidClaims}`);
     expect(invalidClaimsResponse.status).toBe(401);
     expect(invalidClaimsResponse.body.error.code).toBe(ErrorCodes.INVALID_TOKEN);
+  });
+
+  it('lets the signed-in user set their own mobile number', async () => {
+    const app = createApp();
+    const created = await request(app).post('/auth/register').send(registerBody);
+    const accessToken = created.body.data.accessToken as string;
+
+    const missing = await request(app)
+      .patch('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({});
+    expect(missing.status).toBe(400);
+    expect(missing.body.error.code).toBe(ErrorCodes.VALIDATION_ERROR);
+
+    const invalid = await request(app)
+      .patch('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ mobileNumber: '9876543210' });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.code).toBe(ErrorCodes.VALIDATION_ERROR);
+
+    const extra = await request(app)
+      .patch('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ mobileNumber: '+919800000000', email: 'other@example.com' });
+    expect(extra.status).toBe(400);
+    expect(extra.body.error.code).toBe(ErrorCodes.VALIDATION_ERROR);
+
+    const updated = await request(app)
+      .patch('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ mobileNumber: '+919800000000' });
+    expect(updated.status).toBe(200);
+    expect(updated.body.data.user.mobileNumber).toBe('+919800000000');
+    expect(updated.body.data.user.email).toBe('student@example.com');
+
+    await userRepository.create({
+      email: 'other@example.com',
+      passwordHash: await hashPassword(PASSWORD),
+      role: 'STUDENT',
+      status: 'ACTIVE',
+      name: { first: 'Other', last: 'Student' },
+      mobileNumber: '+919811111111',
+    });
+    const duplicate = await request(app)
+      .patch('/auth/me')
+      .set('Authorization', `Bearer ${accessToken}`)
+      .send({ mobileNumber: '+919811111111' });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error.code).toBe(ErrorCodes.MOBILE_NUMBER_ALREADY_REGISTERED);
+
+    await userRepository.create({
+      email: 'legacy@example.com',
+      passwordHash: await hashPassword(PASSWORD),
+      role: 'STUDENT',
+      status: 'ACTIVE',
+      name: { first: 'Leg', last: 'Acy' },
+    });
+    const legacyLogin = await request(app).post('/auth/login').send({
+      email: 'legacy@example.com',
+      password: PASSWORD,
+    });
+    expect(legacyLogin.status).toBe(200);
+    expect(legacyLogin.body.data.user.mobileNumber).toBeNull();
   });
 
   it('rotates refresh tokens and detects reuse', async () => {

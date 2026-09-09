@@ -1,5 +1,6 @@
 import { AppError, ErrorCodes } from '../../shared/errors/app-error';
 import { isValidEmail, normalizeEmail } from './email';
+import { isValidMobileNumber, normalizeMobileNumber } from './mobile-number';
 
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
@@ -8,10 +9,15 @@ export const NAME_MAX_LENGTH = 100;
 export type RegisterInput = {
   email: string;
   password: string;
+  mobileNumber: string;
   name: {
     first: string;
     last: string;
   };
+};
+
+export type UpdateOwnMobileNumberInput = {
+  mobileNumber: string;
 };
 
 export type LoginInput = {
@@ -75,6 +81,18 @@ function validatePassword(password: string): void {
   }
 }
 
+export function validateMobileNumber(value: unknown, field = 'mobileNumber'): string {
+  const normalized = normalizeMobileNumber(readString(value, field));
+
+  if (!isValidMobileNumber(normalized)) {
+    throw validationError({
+      [field]: 'Must be a country code followed by the number, for example +919876543210.',
+    });
+  }
+
+  return normalized;
+}
+
 function validateNamePart(value: unknown, field: string): string {
   const trimmed = readString(value, field).trim();
 
@@ -111,10 +129,20 @@ export function parseRegisterInput(body: unknown): RegisterInput {
   return {
     email,
     password,
+    mobileNumber: validateMobileNumber(record.mobileNumber),
     name: {
       first: validateNamePart(name.first, 'name.first'),
       last: validateNamePart(name.last, 'name.last'),
     },
+  };
+}
+
+export function parseUpdateOwnMobileNumberInput(body: unknown): UpdateOwnMobileNumberInput {
+  const record = asRecord(body);
+  rejectUnknownFields(record, ['mobileNumber']);
+
+  return {
+    mobileNumber: validateMobileNumber(record.mobileNumber),
   };
 }
 

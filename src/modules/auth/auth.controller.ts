@@ -9,12 +9,14 @@ import {
   refresh,
   register,
   resetPassword,
+  updateOwnMobileNumber,
 } from './auth.service';
 import {
   parseForgotPasswordInput,
   parseLoginInput,
   parseRegisterInput,
   parseResetPasswordInput,
+  parseUpdateOwnMobileNumberInput,
 } from './auth.validation';
 import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from './refresh-cookie';
 
@@ -87,6 +89,28 @@ export async function resetPasswordController(req: Request, res: Response): Prom
     success: true,
     data: {
       message: 'Password has been reset successfully.',
+    },
+  });
+}
+
+export async function updateMeController(req: Request, res: Response): Promise<void> {
+  if (!req.auth) {
+    throw new AppError({
+      statusCode: 401,
+      code: ErrorCodes.AUTHENTICATION_REQUIRED,
+      message: 'Authentication required.',
+    });
+  }
+
+  const user = await updateOwnMobileNumber(
+    req.auth.userId,
+    parseUpdateOwnMobileNumberInput(req.body),
+  );
+
+  res.status(200).json({
+    success: true,
+    data: {
+      user,
     },
   });
 }

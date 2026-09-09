@@ -20,7 +20,7 @@ export type UserListFilter = {
   role?: UserRole;
   status?: UserStatus;
   ids?: Array<string | Types.ObjectId>;
-  /** Case-insensitive substring match on name.first, name.last, or email. */
+  /** Case-insensitive substring match on name.first, name.last, email, or mobileNumber. */
   textContains?: string;
 };
 
@@ -35,7 +35,12 @@ function toUserQuery(filter: UserListFilter): Record<string, unknown> {
   if (textContains && textContains.trim() !== '') {
     const pattern = escapeRegex(textContains.trim());
     const regex = { $regex: pattern, $options: 'i' };
-    query.$or = [{ 'name.first': regex }, { 'name.last': regex }, { email: regex }];
+    query.$or = [
+      { 'name.first': regex },
+      { 'name.last': regex },
+      { email: regex },
+      { mobileNumber: regex },
+    ];
   }
 
   return query;
@@ -52,6 +57,13 @@ export const userRepository = {
 
   findByEmail(email: string, options?: SessionOption) {
     return withSession(UserModel.findOne({ email, deletedAt: null }), options?.session).exec();
+  },
+
+  findByMobileNumber(mobileNumber: string, options?: SessionOption) {
+    return withSession(
+      UserModel.findOne({ mobileNumber, deletedAt: null }),
+      options?.session,
+    ).exec();
   },
 
   findOne(filter: UserListFilter, options?: SessionOption) {

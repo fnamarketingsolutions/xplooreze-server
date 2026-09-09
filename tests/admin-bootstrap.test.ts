@@ -24,6 +24,7 @@ const bootstrapEnv = {
   ADMIN_BOOTSTRAP_PASSWORD: PASSWORD,
   ADMIN_BOOTSTRAP_FIRST_NAME: 'Ada',
   ADMIN_BOOTSTRAP_LAST_NAME: 'Admin',
+  ADMIN_BOOTSTRAP_MOBILE_NUMBER: '+919876543210',
 };
 
 function credentials(overrides: Record<string, string> = {}) {
@@ -60,6 +61,7 @@ describe('Phase 12 first Admin bootstrap', () => {
     expect(parsed).toEqual({
       email: 'admin@example.com',
       password: PASSWORD,
+      mobileNumber: '+919876543210',
       name: { first: 'Ada', last: 'Admin' },
     });
 
@@ -77,6 +79,7 @@ describe('Phase 12 first Admin bootstrap', () => {
         ADMIN_BOOTSTRAP_PASSWORD: leaked,
         ADMIN_BOOTSTRAP_FIRST_NAME: 'Ada',
         ADMIN_BOOTSTRAP_LAST_NAME: 'Admin',
+        ADMIN_BOOTSTRAP_MOBILE_NUMBER: '+919876543210',
       });
       throw new Error('expected invalid email to fail');
     } catch (error) {
@@ -84,6 +87,26 @@ describe('Phase 12 first Admin bootstrap', () => {
       expect((error as Error).message).not.toContain(leaked);
       expect((error as Error).message).toBe('Invalid ADMIN_BOOTSTRAP_EMAIL.');
     }
+  });
+
+  it('requires a mobile number only when creating the first Admin', async () => {
+    const withoutMobile = readAdminBootstrapCredentials({
+      ADMIN_BOOTSTRAP_EMAIL: 'admin@example.com',
+      ADMIN_BOOTSTRAP_PASSWORD: PASSWORD,
+      ADMIN_BOOTSTRAP_FIRST_NAME: 'Ada',
+      ADMIN_BOOTSTRAP_LAST_NAME: 'Admin',
+    });
+
+    await expect(seedFirstAdmin(withoutMobile)).rejects.toThrow(
+      'Missing required environment variable: ADMIN_BOOTSTRAP_MOBILE_NUMBER',
+    );
+
+    const created = await seedFirstAdmin(credentials());
+    expect(created.created).toBe(true);
+
+    const again = await seedFirstAdmin(withoutMobile);
+    expect(again.created).toBe(false);
+    expect(again.userId).toBe(created.userId);
   });
 
   it('creates the first Admin with a hashed password from environment credentials', async () => {
@@ -101,6 +124,7 @@ describe('Phase 12 first Admin bootstrap', () => {
       email: 'admin@example.com',
       role: 'ADMIN',
       status: 'ACTIVE',
+      mobileNumber: '+919876543210',
       name: { first: 'Ada', last: 'Admin' },
       deletedAt: null,
     });

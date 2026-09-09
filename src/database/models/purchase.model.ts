@@ -11,6 +11,7 @@ const purchaseReceiptSchema = new Schema(
     issuedAt: { type: Date, required: true },
     studentName: { type: String, required: true, default: '' },
     studentEmail: { type: String, required: true, default: '' },
+    studentMobileNumber: { type: String, required: true, default: '' },
     testSeriesTitle: { type: String, required: true, default: '' },
     amount: { type: Number, required: true },
     currency: { type: String, required: true },

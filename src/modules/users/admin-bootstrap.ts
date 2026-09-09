@@ -1,19 +1,23 @@
 import { remapDuplicateKey } from '../../database/errors';
 import { userRepository } from '../../database/repositories/index';
 import { AppError, ErrorCodes } from '../../shared/errors/app-error';
+import { isMobileNumberDuplicate, mobileAlreadyRegistered } from '../auth/mobile-number';
 import { getLogger } from '../../shared/logger/logger';
 import { NAME_MAX_LENGTH, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../auth/auth.validation';
 import { isValidEmail, normalizeEmail } from '../auth/email';
+import { isValidMobileNumber, normalizeMobileNumber } from '../auth/mobile-number';
 import { hashPassword } from '../auth/password';
 
 export const ADMIN_BOOTSTRAP_EMAIL = 'ADMIN_BOOTSTRAP_EMAIL';
 export const ADMIN_BOOTSTRAP_PASSWORD = 'ADMIN_BOOTSTRAP_PASSWORD';
 export const ADMIN_BOOTSTRAP_FIRST_NAME = 'ADMIN_BOOTSTRAP_FIRST_NAME';
 export const ADMIN_BOOTSTRAP_LAST_NAME = 'ADMIN_BOOTSTRAP_LAST_NAME';
+export const ADMIN_BOOTSTRAP_MOBILE_NUMBER = 'ADMIN_BOOTSTRAP_MOBILE_NUMBER';
 
 export type AdminBootstrapCredentials = {
   email: string;
   password: string;
+  mobileNumber?: string;
   name: {
     first: string;
     last: string;
@@ -74,9 +78,20 @@ export function readAdminBootstrapCredentials(env: NodeJS.ProcessEnv): AdminBoot
     throw new Error(`ADMIN_BOOTSTRAP_PASSWORD must be at most ${PASSWORD_MAX_LENGTH} characters.`);
   }
 
+  const mobileRaw = env[ADMIN_BOOTSTRAP_MOBILE_NUMBER];
+  const mobileNumber =
+    mobileRaw === undefined || mobileRaw.trim() === ''
+      ? undefined
+      : normalizeMobileNumber(mobileRaw);
+
+  if (mobileNumber !== undefined && !isValidMobileNumber(mobileNumber)) {
+    throw new Error('Invalid ADMIN_BOOTSTRAP_MOBILE_NUMBER.');
+  }
+
   return {
     email,
     password,
+    ...(mobileNumber ? { mobileNumber } : {}),
     name: {
       first: readNamePart(env, ADMIN_BOOTSTRAP_FIRST_NAME),
       last: readNamePart(env, ADMIN_BOOTSTRAP_LAST_NAME),
@@ -103,6 +118,10 @@ export async function seedFirstAdmin(
     return alreadyExistsResult(existingAdmin._id.toString());
   }
 
+  if (!credentials.mobileNumber) {
+    throw missingEnv(ADMIN_BOOTSTRAP_MOBILE_NUMBER);
+  }
+
   const passwordHash = await hashPassword(credentials.password);
 
   try {
@@ -112,6 +131,7 @@ export async function seedFirstAdmin(
       role: 'ADMIN',
       status: 'ACTIVE',
       name: credentials.name,
+      mobileNumber: credentials.mobileNumber,
     });
 
     getLogger({ module: 'seed-admin' }).info(
@@ -128,6 +148,10 @@ export async function seedFirstAdmin(
     const racedAdmin = await userRepository.findOne({ role: 'ADMIN' });
     if (racedAdmin) {
       return alreadyExistsResult(racedAdmin._id.toString());
+    }
+
+    if (isMobileNumberDuplicate(error)) {
+      remapDuplicateKey(error, mobileAlreadyRegistered());
     }
 
     remapDuplicateKey(

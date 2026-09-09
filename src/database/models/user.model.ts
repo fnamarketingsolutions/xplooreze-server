@@ -18,12 +18,20 @@ const userSchema = new Schema(
       first: { type: String, required: true, trim: true },
       last: { type: String, required: true, trim: true },
     },
+    mobileNumber: { type: String, trim: true },
     deletedAt: { type: Date, default: null },
   },
   { ...timestampSchemaOptions, collection: COLLECTIONS.users },
 );
 
 userSchema.index({ email: 1 }, { unique: true, partialFilterExpression: { deletedAt: null } });
+userSchema.index(
+  { mobileNumber: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { deletedAt: null, mobileNumber: { $type: 'string' } },
+  },
+);
 userSchema.index({ role: 1 });
 userSchema.index({ status: 1 });
 

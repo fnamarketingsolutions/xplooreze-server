@@ -52,12 +52,20 @@ function bearer(token: string) {
   };
 }
 
+let mobileSequence = 9876500000;
+
+function nextMobileNumber(): string {
+  mobileSequence += 1;
+  return `+91${mobileSequence}`;
+}
+
 async function registerUser(app: ReturnType<typeof createApp>, email = 'student@example.com') {
   return request(app)
     .post('/auth/register')
     .send({
       email,
       password: PASSWORD,
+      mobileNumber: nextMobileNumber(),
       name: { first: 'Ada', last: 'Lovelace' },
     });
 }

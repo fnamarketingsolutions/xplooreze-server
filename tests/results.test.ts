@@ -821,6 +821,7 @@ describe('Phase 11 Results & Result Publication', () => {
         id: await studentIdFor('student@example.com'),
         name: 'Stu Dent',
         email: 'student@example.com',
+        mobileNumber: null,
       });
       expect(detail.body.data.catalog.testSeries).toMatchObject({
         id: catalog.mcq.id,
@@ -885,6 +886,7 @@ describe('Phase 11 Results & Result Publication', () => {
           id: await studentIdFor('evaluator@example.com'),
           name: 'Eva Luator',
           email: 'evaluator@example.com',
+          mobileNumber: null,
         },
       });
     });
